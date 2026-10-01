@@ -1,10 +1,11 @@
 import { create } from 'zustand'
 import type { OpenKind, TileId } from '@engine/index.ts'
+import { balancedLayout, moveInRack, normalizeRack, placeNewTiles, type RackSlot } from '@/lib/rack'
 
 /** Local-only interaction state for the game screen (never synced). */
 interface GameUiStore {
   rackKey: string | null
-  rackOrder: TileId[]
+  rackSlots: RackSlot[]
   selected: TileId[]
   openMode: OpenKind
   busy: boolean
@@ -14,7 +15,8 @@ interface GameUiStore {
   shakeSeq: number
 
   syncRack: (key: string, hand: TileId[]) => void
-  setRackOrder: (order: TileId[]) => void
+  setRackSlots: (slots: RackSlot[]) => void
+  moveTile: (tile: TileId, slot: number) => void
   toggleSelect: (tile: TileId) => void
   setSelected: (tiles: TileId[]) => void
   clearSelection: () => void
@@ -26,20 +28,24 @@ interface GameUiStore {
 
 const storageKey = (key: string) => `okey101:rack:${key}`
 
-function loadOrder(key: string): TileId[] {
+function loadSlots(key: string): RackSlot[] {
   try {
     const raw = localStorage.getItem(storageKey(key))
-    return raw ? (JSON.parse(raw) as TileId[]) : []
+    return normalizeRack(raw ? JSON.parse(raw) : null)
   } catch {
-    return []
+    return normalizeRack(null)
   }
+}
+
+function saveSlots(key: string | null, slots: RackSlot[]) {
+  if (key) localStorage.setItem(storageKey(key), JSON.stringify(slots))
 }
 
 let feedbackSeq = 0
 
 export const useGameUi = create<GameUiStore>((set, get) => ({
   rackKey: null,
-  rackOrder: [],
+  rackSlots: normalizeRack(null),
   selected: [],
   openMode: 'series',
   busy: false,
@@ -49,18 +55,22 @@ export const useGameUi = create<GameUiStore>((set, get) => ({
 
   syncRack: (key, hand) => {
     const state = get()
-    const base = state.rackKey === key ? state.rackOrder : loadOrder(key)
+    const base = state.rackKey === key ? state.rackSlots : loadSlots(key)
     const inHand = new Set(hand)
-    const kept = base.filter((t) => inHand.has(t))
-    const keptSet = new Set(kept)
-    const order = [...kept, ...hand.filter((t) => !keptSet.has(t))]
+    const seen = new Set<TileId>()
+    let slots = base.map((t) => {
+      if (t === null || !inHand.has(t) || seen.has(t)) return null
+      seen.add(t)
+      return t
+    })
+    const missing = hand.filter((t) => !seen.has(t))
+    if (missing.length) slots = seen.size === 0 ? balancedLayout(hand) : placeNewTiles(slots, missing)
     const selected = state.selected.filter((t) => inHand.has(t))
     const pendingTiles = state.pendingTiles.filter((t) => inHand.has(t))
     if (pendingTiles.length !== state.pendingTiles.length) set({ pendingTiles })
     const changed =
       state.rackKey !== key ||
-      order.length !== state.rackOrder.length ||
-      order.some((t, i) => t !== state.rackOrder[i]) ||
+      slots.some((t, i) => t !== state.rackSlots[i]) ||
       selected.length !== state.selected.length
     if (!changed) return
     if (state.rackKey !== key) {
@@ -70,13 +80,19 @@ export const useGameUi = create<GameUiStore>((set, get) => ({
         if (k?.startsWith('okey101:rack:') && k !== storageKey(key)) localStorage.removeItem(k)
       }
     }
-    localStorage.setItem(storageKey(key), JSON.stringify(order))
-    set({ rackKey: key, rackOrder: order, selected })
+    saveSlots(key, slots)
+    set({ rackKey: key, rackSlots: slots, selected })
   },
-  setRackOrder: (order) => {
-    const { rackKey } = get()
-    if (rackKey) localStorage.setItem(storageKey(rackKey), JSON.stringify(order))
-    set({ rackOrder: order })
+  setRackSlots: (slots) => {
+    saveSlots(get().rackKey, slots)
+    set({ rackSlots: slots })
+  },
+  moveTile: (tile, slot) => {
+    const { rackSlots, rackKey } = get()
+    const next = moveInRack(rackSlots, tile, slot)
+    if (next === rackSlots) return
+    saveSlots(rackKey, next)
+    set({ rackSlots: next })
   },
   toggleSelect: (tile) =>
     set((s) => ({

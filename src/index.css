@@ -87,9 +87,15 @@
   :root { --tile-w: 30px; --tile-h: 44px; --tile-font: 17px; }
 }
 
-/* 11 rack columns must fit on 360px phones. */
-@media (max-width: 380px) {
-  :root { --tile-w: 27px; --tile-h: 40px; --tile-font: 15px; }
+:root { --rack-tile-max: 46px; }
+@media (max-width: 1100px) { :root { --rack-tile-max: 40px; } }
+@media (max-width: 640px) { :root { --rack-tile-max: 30px; } }
+
+/* All 15 rack columns must fit the viewport, so rack tiles shrink on narrow phones. */
+.rack-grid {
+  --tile-w: min(var(--rack-tile-max), calc((100vw - 3rem) / 15 - 1px));
+  --tile-h: calc(var(--tile-w) * 1.4);
+  --tile-font: calc(var(--tile-w) * 0.57);
 }
 
 html, body, #root {

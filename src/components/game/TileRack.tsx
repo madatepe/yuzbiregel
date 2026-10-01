@@ -1,14 +1,15 @@
-import { memo, useEffect, useState } from 'react'
-import { SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { memo, useEffect, useState, type ReactNode } from 'react'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
 import type { OkeyInfo, TileId } from '@engine/index.ts'
 import { GameTile } from './GameTile'
+import { RACK_COLS, rackTiles } from '@/lib/rack'
 import { playSound } from '@/lib/sound'
 import { useGameUi } from '@/stores/gameUi'
 
-export const rackDndId = (id: TileId) => `tile:${id}`
+const rackDndId = (id: TileId) => `tile:${id}`
+const slotDndId = (index: number) => `slot:${index}`
 
-interface SortableTileProps {
+interface RackTileProps {
   id: TileId
   okey: OkeyInfo
   selected: boolean
@@ -19,7 +20,7 @@ interface SortableTileProps {
   onQuickDiscard: (id: TileId) => void
 }
 
-const SortableTile = memo(function SortableTile({
+const RackTile = memo(function RackTile({
   id,
   okey,
   selected,
@@ -28,15 +29,13 @@ const SortableTile = memo(function SortableTile({
   dealDelay,
   onToggle,
   onQuickDiscard,
-}: SortableTileProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: rackDndId(id) })
+}: RackTileProps) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: rackDndId(id) })
   return (
     <div
       ref={setNodeRef}
       style={{
-        transform: CSS.Translate.toString(transform),
-        transition,
-        opacity: isDragging ? 0.35 : inFlight ? 0.45 : 1,
+        opacity: isDragging ? 0.3 : inFlight ? 0.45 : 1,
         animationDelay: dealDelay !== null ? `${dealDelay}ms` : undefined,
       }}
       className={`touch-none ${dealDelay !== null ? 'animate-tile-in' : ''}`}
@@ -63,6 +62,21 @@ const SortableTile = memo(function SortableTile({
   )
 })
 
+const RackSlotCell = memo(function RackSlotCell({ index, children }: { index: number; children?: ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: slotDndId(index) })
+  return (
+    <div
+      ref={setNodeRef}
+      className={`relative rounded-[calc(var(--tile-w)*0.16)] transition-colors duration-100 ${
+        isOver ? 'bg-accent/35 ring-2 ring-accent' : children ? '' : 'bg-black/12 shadow-[inset_0_2px_4px_rgb(0_0_0/0.25)]'
+      }`}
+      style={{ width: 'var(--tile-w)', height: 'var(--tile-h)' }}
+    >
+      {children}
+    </div>
+  )
+})
+
 interface TileRackProps {
   okey: OkeyInfo
   round: number
@@ -71,7 +85,7 @@ interface TileRackProps {
 }
 
 function TileRackImpl({ okey, round, pendingTake, onQuickDiscard }: TileRackProps) {
-  const order = useGameUi((s) => s.rackOrder)
+  const slots = useGameUi((s) => s.rackSlots)
   const selected = useGameUi((s) => s.selected)
   const toggleSelect = useGameUi((s) => s.toggleSelect)
   const shakeSeq = useGameUi((s) => s.shakeSeq)
@@ -97,34 +111,40 @@ function TileRackImpl({ okey, round, pendingTake, onQuickDiscard }: TileRackProp
     toggleSelect(id)
   }
 
+  const count = rackTiles(slots).length
+  let ordinal = 0
+
   return (
     <div
       data-rack
-      className={`rack relative rounded-2xl px-2 pt-4 pb-2 shadow-[0_14px_30px_rgb(0_0_0/0.5),inset_0_-4px_0_rgb(0_0_0/0.25)] sm:px-4 ${shaking ? 'animate-shake' : ''}`}
-      aria-label={`Istakan, ${order.length} taş${selected.length ? `, ${selected.length} seçili` : ''}`}
+      className={`rack rack-grid relative rounded-2xl px-1.5 pt-4 pb-2 shadow-[0_14px_30px_rgb(0_0_0/0.5),inset_0_-4px_0_rgb(0_0_0/0.25)] sm:px-4 ${shaking ? 'animate-shake' : ''}`}
+      aria-label={`Istakan, ${count} taş${selected.length ? `, ${selected.length} seçili` : ''}`}
       role="group"
     >
-      <SortableContext items={order.map(rackDndId)} strategy={rectSortingStrategy}>
-        <div
-          className="grid justify-center gap-x-0.5 gap-y-3 sm:gap-x-1.5"
-          style={{ gridTemplateColumns: `repeat(${Math.max(Math.ceil(order.length / 2), 6)}, var(--tile-w))` }}
-        >
-          {order.map((id, i) => (
-            <SortableTile
-              key={id}
-              id={id}
-              okey={okey}
-              selected={selected.includes(id)}
-              pending={pendingTake === id}
-              inFlight={pendingTiles.includes(id)}
-              dealDelay={dealRound === round ? i * 35 : null}
-              onToggle={onToggle}
-              onQuickDiscard={onQuickDiscard}
-            />
-          ))}
-        </div>
-      </SortableContext>
-      {order.length === 0 && <div className="py-6 text-center text-sm text-white/50">Istakan boş</div>}
+      <div
+        className="grid justify-center gap-x-px gap-y-3 sm:gap-x-1.5"
+        style={{ gridTemplateColumns: `repeat(${RACK_COLS}, var(--tile-w))` }}
+      >
+        {slots.map((id, i) => {
+          const deal = id !== null && dealRound === round ? ordinal++ * 35 : null
+          return (
+            <RackSlotCell key={i} index={i}>
+              {id !== null && (
+                <RackTile
+                  id={id}
+                  okey={okey}
+                  selected={selected.includes(id)}
+                  pending={pendingTake === id}
+                  inFlight={pendingTiles.includes(id)}
+                  dealDelay={deal}
+                  onToggle={onToggle}
+                  onQuickDiscard={onQuickDiscard}
+                />
+              )}
+            </RackSlotCell>
+          )
+        })}
+      </div>
     </div>
   )
 }

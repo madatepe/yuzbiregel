@@ -6,15 +6,14 @@ import {
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
-  closestCenter,
   pointerWithin,
+  rectIntersection,
   useSensor,
   useSensors,
   type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { attachableMelds, availableActions, type PublicRoundState, type TileId } from '@engine/index.ts'
 import { ActionBar } from '@/components/game/ActionBar'
 import { GameResult } from '@/components/game/GameResult'
@@ -37,7 +36,7 @@ import { useGameAnimations } from '@/hooks/useGameAnimations'
 import { sideOf, useMySeat, useSeatInfos, useTotals, type SeatInfo } from '@/hooks/useGameView'
 import { api } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
-import { sortByPairs, sortBySeries } from '@/lib/tiles'
+import { groupLayout, pairGroups, rackTiles, seriesGroups } from '@/lib/rack'
 import { useGameUi } from '@/stores/gameUi'
 import { useSession } from '@/stores/session'
 import { useTable } from '@/stores/table'
@@ -47,9 +46,11 @@ const collision: CollisionDetection = (args) => {
   const within = pointerWithin(args)
   const target = within.find((c) => c.id === 'discard' || String(c.id).startsWith('meld:'))
   if (target) return [target]
-  return closestCenter({
+  const slot = within.find((c) => String(c.id).startsWith('slot:'))
+  if (slot) return [slot]
+  return rectIntersection({
     ...args,
-    droppableContainers: args.droppableContainers.filter((c) => String(c.id).startsWith('tile:')),
+    droppableContainers: args.droppableContainers.filter((c) => String(c.id).startsWith('slot:')),
   })
 }
 
@@ -85,12 +86,12 @@ export default function Game() {
   const totals = useTotals()
   const perform = useGameActions()
 
-  const rackOrder = useGameUi((s) => s.rackOrder)
   const selected = useGameUi((s) => s.selected)
   const openMode = useGameUi((s) => s.openMode)
   const feedback = useGameUi((s) => s.feedback)
   const syncRack = useGameUi((s) => s.syncRack)
-  const setRackOrder = useGameUi((s) => s.setRackOrder)
+  const setRackSlots = useGameUi((s) => s.setRackSlots)
+  const moveTile = useGameUi((s) => s.moveTile)
   const setSelected = useGameUi((s) => s.setSelected)
 
   const [scoreOpen, setScoreOpen] = useState(false)
@@ -124,7 +125,7 @@ export default function Game() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 160, tolerance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor),
   )
 
   const pendingUnused = !!pub && pub.pendingTake !== null && hand.includes(pub.pendingTake)
@@ -169,10 +170,12 @@ export default function Game() {
         const sel = useGameUi.getState().selected
         if (sel.length === 1) void discard(sel[0])
       },
-      onSortSeries: () => pub && setRackOrder(sortBySeries(useGameUi.getState().rackOrder, pub.okey)),
-      onSortPairs: () => pub && setRackOrder(sortByPairs(useGameUi.getState().rackOrder, pub.okey)),
+      onSortSeries: () =>
+        pub && setRackSlots(groupLayout(seriesGroups(rackTiles(useGameUi.getState().rackSlots), pub.okey))),
+      onSortPairs: () =>
+        pub && setRackSlots(groupLayout(pairGroups(rackTiles(useGameUi.getState().rackSlots), pub.okey))),
     }),
-    [perform, discard, pub, setRackOrder],
+    [perform, discard, pub, setRackSlots],
   )
 
   const onAttachSingle = useCallback(() => {
@@ -207,12 +210,7 @@ export default function Game() {
       attach(Number(overId.slice(5)), tile)
       return
     }
-    if (overId.startsWith('tile:')) {
-      const target = Number(overId.slice(5))
-      const from = rackOrder.indexOf(tile)
-      const to = rackOrder.indexOf(target)
-      if (from >= 0 && to >= 0 && from !== to) setRackOrder(arrayMove(rackOrder, from, to))
-    }
+    if (overId.startsWith('slot:')) moveTile(tile, Number(overId.slice(5)))
   }
 
   const continueRound = async () => {

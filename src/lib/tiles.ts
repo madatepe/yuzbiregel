@@ -38,17 +38,3 @@ export function sortBySeries(tiles: TileId[], okey: OkeyInfo): TileId[] {
     return ca - cb || va - vb || a - b
   })
 }
-
-/** Group identical tiles next to each other (for pair play). */
-export function sortByPairs(tiles: TileId[], okey: OkeyInfo): TileId[] {
-  const key = (id: TileId) => {
-    const f = tileFace(id)
-    return f.fake ? `${okey.color}:${okey.value}` : `${f.color}:${f.value}`
-  }
-  const counts = new Map<string, number>()
-  for (const t of tiles) counts.set(key(t), (counts.get(key(t)) ?? 0) + 1)
-  const series = sortBySeries(tiles, okey)
-  const pairs = series.filter((t) => !isJoker(t, okey) && (counts.get(key(t)) ?? 0) >= 2)
-  const rest = series.filter((t) => !pairs.includes(t))
-  return [...pairs, ...rest]
-}
