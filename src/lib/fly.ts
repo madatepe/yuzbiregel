@@ -16,9 +16,13 @@ export function takeRemembered(id: TileId): DOMRect | null {
   return r
 }
 
+/** Rect of the first visible element with the given anchor (hidden duplicates are skipped). */
 export function anchorRect(name: string): DOMRect | null {
-  const el = document.querySelector<HTMLElement>(`[data-anchor="${name}"]`)
-  return el ? el.getBoundingClientRect() : null
+  for (const el of document.querySelectorAll<HTMLElement>(`[data-anchor="${name}"]`)) {
+    const r = el.getBoundingClientRect()
+    if (r.width && r.height) return r
+  }
+  return null
 }
 
 const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches

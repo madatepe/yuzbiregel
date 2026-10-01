@@ -90,7 +90,7 @@ export function RulesModal({ open, onClose }: { open: boolean; onClose: () => vo
   )
 }
 
-export function RulesButton({ className = '' }: { className?: string }) {
+export function RulesButton({ className = '', showLabel = false }: { className?: string; showLabel?: boolean }) {
   const [open, setOpen] = useState(false)
   return (
     <>
@@ -103,7 +103,7 @@ export function RulesButton({ className = '' }: { className?: string }) {
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ivory-100 text-[11px] font-black text-felt-900" aria-hidden>
           ?
         </span>
-        <span className="hidden sm:inline">OYUN KURALLARI</span>
+        <span className={showLabel ? '' : 'hidden sm:inline'}>OYUN KURALLARI</span>
       </button>
       <RulesModal open={open} onClose={() => setOpen(false)} />
     </>

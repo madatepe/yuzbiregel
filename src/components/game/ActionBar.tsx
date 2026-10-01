@@ -47,9 +47,9 @@ function ActionBarImpl({
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="flex min-h-[68px] flex-wrap items-center justify-center gap-x-3 gap-y-2">
+      <div className="flex min-h-12 flex-wrap items-center justify-center gap-x-3 gap-y-2 md:min-h-[68px]">
         {!actions.isMyTurn && (
-          <span className="text-sm font-semibold text-ivory-400">Sıranı beklerken taşlarını dizebilirsin.</span>
+          <span className="hidden text-sm font-semibold text-ivory-400 md:inline">Sıranı beklerken taşlarını dizebilirsin.</span>
         )}
         {inDraw && (
           <>
@@ -134,13 +134,13 @@ function ActionBarImpl({
         )}
       </div>
 
-      <div className="flex min-h-5 items-center gap-3">
+      <div className="flex items-center gap-3 md:min-h-5">
         {feedback ? (
           <span key={feedback.seq} className="animate-fade-up text-sm font-semibold text-danger" role="alert">
             {feedback.message}
           </span>
         ) : (
-          <div className="flex items-center gap-1 text-[11px] font-semibold text-ivory-400">
+          <div className="hidden items-center gap-1 text-[11px] font-semibold text-ivory-400 md:flex">
             <span className="hidden sm:inline">Diz:</span>
             <button type="button" onClick={onSortSeries} className="rounded-md px-2 py-0.5 hover:bg-white/10 hover:text-ivory-50">
               Seri diz

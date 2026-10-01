@@ -1,6 +1,6 @@
 import { useSound } from '@/lib/sound'
 
-export function SoundToggle() {
+export function SoundToggle({ showLabel = false }: { showLabel?: boolean }) {
   const enabled = useSound((s) => s.enabled)
   const toggle = useSound((s) => s.toggle)
   return (
@@ -20,7 +20,7 @@ export function SoundToggle() {
           <path d="M16.5 9.5l5 5M21.5 9.5l-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         )}
       </svg>
-      <span className="hidden sm:inline">{enabled ? 'SES AÇIK' : 'SES KAPALI'}</span>
+      <span className={showLabel ? '' : 'hidden sm:inline'}>{enabled ? 'SES AÇIK' : 'SES KAPALI'}</span>
     </button>
   )
 }

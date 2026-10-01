@@ -17,6 +17,7 @@ import {
 import { attachableMelds, availableActions, type PublicRoundState, type TileId } from '@engine/index.ts'
 import { ActionBar } from '@/components/game/ActionBar'
 import { GameResult } from '@/components/game/GameResult'
+import { GameMenu } from '@/components/game/GameMenu'
 import { GameTable } from '@/components/game/GameTable'
 import { GameTile } from '@/components/game/GameTile'
 import { PlayerSeat } from '@/components/game/PlayerSeat'
@@ -53,6 +54,9 @@ const collision: CollisionDetection = (args) => {
     droppableContainers: args.droppableContainers.filter((c) => String(c.id).startsWith('slot:')),
   })
 }
+
+const SORT_PILL =
+  'rounded-full bg-black/30 px-3 py-1 text-[11px] font-bold text-ivory-200 ring-1 ring-white/10 transition active:bg-white/15'
 
 function instructionFor(
   pub: PublicRoundState,
@@ -94,6 +98,7 @@ export default function Game() {
   const moveTile = useGameUi((s) => s.moveTile)
   const setSelected = useGameUi((s) => s.setSelected)
 
+  const [menuOpen, setMenuOpen] = useState(false)
   const [scoreOpen, setScoreOpen] = useState(false)
   const [leaveOpen, setLeaveOpen] = useState(false)
   const [showFinal, setShowFinal] = useState(false)
@@ -296,6 +301,18 @@ export default function Game() {
           </div>
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
             <ConnectionStatus compact />
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/8 text-ivory-200 ring-1 ring-white/10 transition hover:bg-white/14 md:hidden"
+              aria-label="Menüyü aç"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+                <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+          <div className="hidden items-center gap-2 md:flex">
             <ScoreBadge
               total={totals[mySeat]}
               mode={table.mode}
@@ -317,13 +334,6 @@ export default function Game() {
             </button>
           </div>
         </header>
-
-        {/* Mobile opponents strip */}
-        <div className="flex shrink-0 gap-2 px-2 pt-1 pb-2 md:hidden">
-          {[bySide.left, bySide.top, bySide.right].map((s) => (
-            <PlayerSeat key={s} {...seatProps(s)} side={sideOf(s, mySeat)} compact />
-          ))}
-        </div>
 
         {/* Table area */}
         <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[1fr] gap-3 px-2 sm:px-4 md:grid-cols-[auto_1fr_auto] md:grid-rows-[auto_1fr]">
@@ -386,6 +396,15 @@ export default function Game() {
               </div>
             </div>
 
+            <div className="-mb-1 flex justify-end gap-1.5 md:hidden">
+              <button type="button" onClick={handlers.onSortSeries} className={SORT_PILL}>
+                Seri diz
+              </button>
+              <button type="button" onClick={handlers.onSortPairs} className={SORT_PILL}>
+                Çift diz
+              </button>
+            </div>
+
             <TileRack okey={pub.okey} round={pub.round} pendingTake={pub.pendingTake} onQuickDiscard={onQuickDiscard} />
 
             <ActionBar
@@ -408,6 +427,23 @@ export default function Game() {
       <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(.2,.8,.3,1)' }}>
         {dragTile !== null ? <GameTile id={dragTile} okey={pub.okey} selected className="cursor-grabbing" /> : null}
       </DragOverlay>
+
+      <GameMenu
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        players={[bySide.left, bySide.top, bySide.right].map((s) => (
+          <PlayerSeat key={s} {...seatProps(s)} side={sideOf(s, mySeat)} compact />
+        ))}
+        scoreLabel={String(table.mode === 'team' ? teams[mySeat % 2] : totals[mySeat])}
+        onScoreboard={() => {
+          setMenuOpen(false)
+          setScoreOpen(true)
+        }}
+        onLeave={() => {
+          setMenuOpen(false)
+          setLeaveOpen(true)
+        }}
+      />
 
       <Scoreboard
         open={scoreOpen}

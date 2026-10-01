@@ -24,7 +24,7 @@ export function useGameAnimations(mySeat: number) {
     const { events, pub } = useTable.getState()
     if (!pub) return
     for (const e of events) {
-      const seatAnchor = anchorRect(`seat-${e.seat}`)
+      const seatAnchor = anchorRect(`seat-${e.seat}`) ?? anchorRect(`discard-${e.seat}`)
       const mine = e.seat === mySeat
       switch (e.type) {
         case 'TILE_DRAWN': {
