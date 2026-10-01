@@ -1,4 +1,4 @@
-import { isJoker, tileFace, type OkeyInfo, type TileId } from '@engine/index.ts'
+import { isJoker, isPair, partitionSeries, tileFace, type OkeyInfo, type OpenKind, type TileId } from '@engine/index.ts'
 import { sortBySeries } from './tiles'
 
 /** The rack is a fixed grid of slots (2 rows) so players can leave gaps between groups. */
@@ -148,6 +148,57 @@ export function moveInRack(slots: RackSlot[], tile: TileId, to: number): RackSlo
   }
   next[to] = tile
   return next
+}
+
+/** Runs of adjacent tiles on the same row; an empty slot or the row end splits them. */
+export function rackGroups(slots: RackSlot[]): TileId[][] {
+  const groups: TileId[][] = []
+  let current: TileId[] = []
+  slots.forEach((t, i) => {
+    if (i % RACK_COLS === 0 && current.length) {
+      groups.push(current)
+      current = []
+    }
+    if (t === null) {
+      if (current.length) groups.push(current)
+      current = []
+    } else current.push(t)
+  })
+  if (current.length) groups.push(current)
+  return groups
+}
+
+/**
+ * Tiles the player has arranged into valid melds (series) or adjacent pairs on the rack.
+ * Within a group, the longest valid stretch starting at each position wins.
+ */
+export function arrangedMeldTiles(slots: RackSlot[], okey: OkeyInfo, mode: OpenKind): TileId[] {
+  const out: TileId[] = []
+  for (const g of rackGroups(slots)) {
+    let i = 0
+    while (i < g.length) {
+      if (mode === 'pairs') {
+        if (i + 1 < g.length && isPair([g[i], g[i + 1]], okey)) {
+          out.push(g[i], g[i + 1])
+          i += 2
+        } else i++
+        continue
+      }
+      let end = -1
+      for (let j = g.length; j >= i + 3; j--) {
+        if (partitionSeries(g.slice(i, j), okey)) {
+          end = j
+          break
+        }
+      }
+      if (end < 0) i++
+      else {
+        out.push(...g.slice(i, end))
+        i = end
+      }
+    }
+  }
+  return out
 }
 
 /** Puts newly received tiles into the first free slot after the last occupied one. */

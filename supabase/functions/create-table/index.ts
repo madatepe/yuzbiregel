@@ -1,5 +1,5 @@
 import { ApiError, cleanNickname, handler } from '../_shared/http.ts'
-import { generateCode } from '../_shared/tables.ts'
+import { generateCode, sweepTables } from '../_shared/tables.ts'
 
 Deno.serve(
   handler(async ({ db, user, body }) => {
@@ -10,6 +10,7 @@ Deno.serve(
     if (![1, 6, 11].includes(rounds)) throw new ApiError('BAD_REQUEST')
 
     await db.from('profiles').upsert({ id: user.id, nickname, updated_at: new Date().toISOString() })
+    await sweepTables(db)
 
     for (let attempt = 0; attempt < 5; attempt++) {
       const code = generateCode()

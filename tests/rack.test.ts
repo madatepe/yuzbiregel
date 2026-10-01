@@ -3,6 +3,7 @@ import { okeyFromIndicator } from '@engine/index.ts'
 import {
   RACK_COLS,
   RACK_SLOTS,
+  arrangedMeldTiles,
   balancedLayout,
   emptyRack,
   groupLayout,
@@ -76,5 +77,23 @@ describe('rack slots', () => {
     expect(series[0]).toEqual([id(0, 3), id(0, 4), id(0, 5)])
     const pairs = pairGroups([...red, ...blue], okey)
     expect(pairs[0]).toEqual([id(1, 7), id(1, 7, 1)])
+  })
+
+  it('counts pairs arranged side by side on the rack', () => {
+    const slots = emptyRack()
+    ;[id(0, 9), id(0, 9, 1), null, id(1, 1), id(1, 1, 1), id(0, 4)].forEach((t, i) => (slots[i] = t))
+    slots[RACK_COLS - 1] = id(1, 5)
+    slots[RACK_COLS] = id(1, 5, 1)
+    expect(arrangedMeldTiles(slots, okey, 'pairs')).toEqual([id(0, 9), id(0, 9, 1), id(1, 1), id(1, 1, 1)])
+  })
+
+  it('counts runs and sets inside rack groups, skipping loose tiles', () => {
+    const slots = emptyRack()
+    ;[id(0, 13), id(1, 4), id(1, 5), id(1, 6), id(1, 7), null, id(0, 10), id(1, 10), id(2, 10)].forEach(
+      (t, i) => (slots[i] = t),
+    )
+    expect(arrangedMeldTiles(slots, okey, 'series')).toEqual([
+      id(1, 4), id(1, 5), id(1, 6), id(1, 7), id(0, 10), id(1, 10), id(2, 10),
+    ])
   })
 })

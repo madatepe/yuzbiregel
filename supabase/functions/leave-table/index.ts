@@ -1,5 +1,5 @@
 import { handler, str } from '../_shared/http.ts'
-import { loadSeats, loadTable, touchTable } from '../_shared/tables.ts'
+import { deleteTable, loadSeats, loadTable, sweepTables, touchTable } from '../_shared/tables.ts'
 import { randomInt } from '../_shared/engine/index.ts'
 
 Deno.serve(
@@ -23,13 +23,12 @@ Deno.serve(
     }
 
     const remaining = seats.filter((s) => s.seat !== mine.seat && !s.left_at)
-    const patch: Record<string, unknown> = {}
     if (remaining.length === 0) {
-      patch.status = 'closed'
-    } else if (table.owner_id === user.id) {
-      patch.owner_id = remaining[randomInt(remaining.length)].player_id
+      await deleteTable(db, table.id)
+    } else {
+      await touchTable(db, table.id, table.owner_id === user.id ? { owner_id: remaining[randomInt(remaining.length)].player_id } : {})
     }
-    await touchTable(db, table.id, patch)
+    await sweepTables(db)
     return { ok: true }
   }),
 )

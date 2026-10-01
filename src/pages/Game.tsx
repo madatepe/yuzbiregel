@@ -37,7 +37,7 @@ import { useGameAnimations } from '@/hooks/useGameAnimations'
 import { sideOf, useMySeat, useSeatInfos, useTotals, type SeatInfo } from '@/hooks/useGameView'
 import { api } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
-import { groupLayout, pairGroups, rackTiles, seriesGroups } from '@/lib/rack'
+import { arrangedMeldTiles, groupLayout, pairGroups, rackTiles, seriesGroups } from '@/lib/rack'
 import { useGameUi } from '@/stores/gameUi'
 import { useSession } from '@/stores/session'
 import { useTable } from '@/stores/table'
@@ -54,6 +54,8 @@ const collision: CollisionDetection = (args) => {
     droppableContainers: args.droppableContainers.filter((c) => String(c.id).startsWith('slot:')),
   })
 }
+
+const EMPTY: TileId[] = []
 
 const SORT_PILL =
   'rounded-full bg-black/30 px-3 py-1 text-[11px] font-bold text-ivory-200 ring-1 ring-white/10 transition active:bg-white/15'
@@ -74,7 +76,7 @@ function instructionFor(
   if (pub.pendingTake !== null && hand.includes(pub.pendingTake))
     return 'Aldığın taşı kullan: elini aç ya da işle. Kullanamazsan geri bırak (+101).'
   if (hand.length === 1) return 'Son taşını atarak bitir!'
-  if (!pub.opened[mySeat]) return 'Açmak için taşları seç ya da atacağın taşı seç.'
+  if (!pub.opened[mySeat]) return 'Perlerini ıstakada aralarında boşlukla diz, sonra elini aç. Ya da atacağın taşı seç.'
   return 'Per aç, işle ya da bir taş at.'
 }
 
@@ -122,10 +124,19 @@ export default function Game() {
     if (table.status !== 'finished') setShowFinal(false)
   }, [table.status])
 
-  const actions = useMemo(
-    () => (pub ? availableActions(pub, mySeat, hand, selected, openMode) : null),
-    [pub, mySeat, hand, selected, openMode],
+  const rackSlots = useGameUi((s) => s.rackSlots)
+  const arranged = useMemo(
+    () => (pub && !pub.opened[mySeat] && selected.length === 0 ? arrangedMeldTiles(rackSlots, pub.okey, openMode) : []),
+    [pub, mySeat, selected.length, rackSlots, openMode],
   )
+  const openTiles = selected.length > 0 ? selected : arranged
+
+  const actions = useMemo(() => {
+    if (!pub) return null
+    const base = availableActions(pub, mySeat, hand, selected, openMode)
+    if (!base.open || selected.length > 0) return base
+    return { ...base, open: availableActions(pub, mySeat, hand, arranged, openMode).open }
+  }, [pub, mySeat, hand, selected, openMode, arranged])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -163,9 +174,8 @@ export default function Game() {
       onTake: () => void perform({ type: 'take_discard' }),
       onReturn: () => void perform({ type: 'return_discard' }),
       onOpen: () => {
-        const sel = useGameUi.getState().selected
         const mode = useGameUi.getState().openMode
-        void perform({ type: mode === 'series' ? 'open_series' : 'open_pairs', tiles: sel }, sel)
+        void perform({ type: mode === 'series' ? 'open_series' : 'open_pairs', tiles: openTiles }, openTiles)
       },
       onLay: () => {
         const sel = useGameUi.getState().selected
@@ -180,7 +190,7 @@ export default function Game() {
       onSortPairs: () =>
         pub && setRackSlots(groupLayout(pairGroups(rackTiles(useGameUi.getState().rackSlots), pub.okey))),
     }),
-    [perform, discard, pub, setRackSlots],
+    [perform, discard, pub, setRackSlots, openTiles],
   )
 
   const onAttachSingle = useCallback(() => {
@@ -405,7 +415,13 @@ export default function Game() {
               </button>
             </div>
 
-            <TileRack okey={pub.okey} round={pub.round} pendingTake={pub.pendingTake} onQuickDiscard={onQuickDiscard} />
+            <TileRack
+              okey={pub.okey}
+              round={pub.round}
+              pendingTake={pub.pendingTake}
+              counted={inDiscardPhase ? arranged : EMPTY}
+              onQuickDiscard={onQuickDiscard}
+            />
 
             <ActionBar
               actions={actions}

@@ -13,6 +13,7 @@ interface RackTileProps {
   id: TileId
   okey: OkeyInfo
   selected: boolean
+  counted: boolean
   pending: boolean
   inFlight: boolean
   dealDelay: number | null
@@ -24,6 +25,7 @@ const RackTile = memo(function RackTile({
   id,
   okey,
   selected,
+  counted,
   pending,
   inFlight,
   dealDelay,
@@ -48,6 +50,7 @@ const RackTile = memo(function RackTile({
         id={id}
         okey={okey}
         selected={selected}
+        highlight={counted}
         onClick={() => onToggle(id)}
         onDoubleClick={() => onQuickDiscard(id)}
         badge={
@@ -81,10 +84,12 @@ interface TileRackProps {
   okey: OkeyInfo
   round: number
   pendingTake: TileId | null
+  /** Tiles counted toward opening from the rack arrangement (outlined). */
+  counted: TileId[]
   onQuickDiscard: (id: TileId) => void
 }
 
-function TileRackImpl({ okey, round, pendingTake, onQuickDiscard }: TileRackProps) {
+function TileRackImpl({ okey, round, pendingTake, counted, onQuickDiscard }: TileRackProps) {
   const slots = useGameUi((s) => s.rackSlots)
   const selected = useGameUi((s) => s.selected)
   const toggleSelect = useGameUi((s) => s.toggleSelect)
@@ -134,6 +139,7 @@ function TileRackImpl({ okey, round, pendingTake, onQuickDiscard }: TileRackProp
                   id={id}
                   okey={okey}
                   selected={selected.includes(id)}
+                  counted={counted.includes(id)}
                   pending={pendingTake === id}
                   inFlight={pendingTiles.includes(id)}
                   dealDelay={deal}

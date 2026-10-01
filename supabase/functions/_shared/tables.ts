@@ -49,6 +49,26 @@ export async function touchTable(db: SupabaseClient, tableId: string, patch: Rec
   if (error) throw error
 }
 
+/** Seats, hands, game state and scores are removed by `on delete cascade`. */
+export async function deleteTable(db: SupabaseClient, tableId: string) {
+  const { error } = await db.from('game_tables').delete().eq('id', tableId)
+  if (error) throw error
+}
+
+/**
+ * Removes tables closed by their owner (kept briefly so connected players see the
+ * close) and tables nobody has touched for a day (e.g. everyone just closed the tab).
+ */
+export async function sweepTables(db: SupabaseClient) {
+  const closedBefore = new Date(Date.now() - 10 * 60_000).toISOString()
+  const idleBefore = new Date(Date.now() - 24 * 3600_000).toISOString()
+  const { error } = await db
+    .from('game_tables')
+    .delete()
+    .or(`and(status.eq.closed,updated_at.lt.${closedBefore}),updated_at.lt.${idleBefore}`)
+  if (error) console.error('sweepTables', error)
+}
+
 export async function startRound(
   db: SupabaseClient,
   table: TableRow,
