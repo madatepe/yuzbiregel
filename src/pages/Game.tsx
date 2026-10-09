@@ -21,6 +21,7 @@ import { GameMenu } from '@/components/game/GameMenu'
 import { GameTable } from '@/components/game/GameTable'
 import { GameTile } from '@/components/game/GameTile'
 import { PlayerSeat } from '@/components/game/PlayerSeat'
+import { ReactionProvider } from '@/components/game/ReactionLayer'
 import { RoundResult } from '@/components/game/RoundResult'
 import { RulesButton } from '@/components/game/RulesModal'
 import { ScoreBadge, Scoreboard, teamTotals } from '@/components/game/Scoreboard'
@@ -287,6 +288,7 @@ export default function Game() {
   const dragging = dragTile !== null
 
   return (
+    <ReactionProvider>
     <DndContext
       sensors={sensors}
       collisionDetection={collision}
@@ -373,15 +375,28 @@ export default function Game() {
           </div>
         </div>
 
+        <div className="flex gap-1 px-2 pb-1 md:hidden">
+          {opponents.map((s) => (
+            <PlayerSeat key={s} {...seatProps(s)} side={sideOf(s, mySeat)} compact />
+          ))}
+        </div>
+
         {/* My area */}
-        <section className="shrink-0 px-2 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] sm:px-4" aria-label="Senin alanın">
+        <section className="relative shrink-0 px-2 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] sm:px-4" aria-label="Senin alanın">
+          <div
+            data-anchor={`seat-${mySeat}`}
+            className="pointer-events-none absolute bottom-3 left-1/2 h-8 w-8 -translate-x-1/2 sm:hidden"
+            aria-hidden
+          />
           <div className="mx-auto flex max-w-6xl flex-col gap-2">
             <div className="flex items-center gap-3">
               <div
                 data-anchor={`seat-${mySeat}`}
                 className={`hidden shrink-0 items-center gap-2 rounded-2xl px-2.5 py-1.5 sm:flex ${actions.isMyTurn ? 'bg-accent/15 ring-2 ring-accent' : 'bg-black/25 ring-1 ring-white/8'}`}
               >
-                <PlayerAvatar name={me.nickname} size={36} active={actions.isMyTurn} />
+                <span data-anchor={`face-${mySeat}`} className="inline-flex">
+                  <PlayerAvatar name={me.nickname} size={36} active={actions.isMyTurn} />
+                </span>
                 <div className="leading-tight">
                   <div className="max-w-28 truncate text-sm font-extrabold">{me.nickname}</div>
                   <div className="text-[11px] text-ivory-300">
@@ -515,5 +530,6 @@ export default function Game() {
         onLeave={leave}
       />
     </DndContext>
+    </ReactionProvider>
   )
 }

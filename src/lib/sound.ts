@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type SoundName = 'draw' | 'discard' | 'select' | 'open' | 'invalid' | 'turn' | 'roundEnd' | 'gameEnd'
+export type SoundName = 'draw' | 'discard' | 'select' | 'open' | 'invalid' | 'turn' | 'roundEnd' | 'gameEnd' | 'react'
 
 const STORAGE_KEY = 'okey101:sound'
 
@@ -46,6 +46,10 @@ const CUES: Record<SoundName, Note[]> = {
     { freq: 659, at: 0.14, dur: 0.14, type: 'triangle', gain: 0.07 },
     { freq: 784, at: 0.28, dur: 0.14, type: 'triangle', gain: 0.07 },
     { freq: 1046, at: 0.42, dur: 0.4, type: 'triangle', gain: 0.08 },
+  ],
+  react: [
+    { freq: 660, at: 0, dur: 0.05, type: 'triangle', gain: 0.045 },
+    { freq: 990, at: 0.05, dur: 0.08, type: 'sine', gain: 0.05 },
   ],
 }
 

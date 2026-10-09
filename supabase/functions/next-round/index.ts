@@ -1,6 +1,7 @@
 import { ApiError, handler, str } from '../_shared/http.ts'
-import { activeSeatOf, loadSeats, loadTable, startRound } from '../_shared/tables.ts'
+import { activeSeatOf, advancePistiBots, loadSeats, loadTable, startRound } from '../_shared/tables.ts'
 import { nextSeat, type RoundState } from '../_shared/engine/index.ts'
+import { isPistiState, nextSeat as pistiNext, type PistiState } from '../_shared/pisti/index.ts'
 
 Deno.serve(
   handler(async ({ db, user, body }) => {
@@ -15,12 +16,26 @@ Deno.serve(
     if (table.status !== 'round_end') throw new ApiError('BAD_STATE')
     if (seats.length !== 4) throw new ApiError('NEED_4_PLAYERS')
     if (secretRes.error) throw secretRes.error
-    const prev = secretRes.data.state as RoundState
 
     try {
-      await startRound(db, table, seats, table.game_no, table.current_round + 1, nextSeat(prev.starter), 'round_end')
+      if (table.game_type === 'pisti' || isPistiState(secretRes.data.state)) {
+        const prev = secretRes.data.state as PistiState
+        await startRound(
+          db,
+          table,
+          seats,
+          table.game_no,
+          table.current_round + 1,
+          pistiNext(prev.dealer),
+          'round_end',
+          prev.teamScores,
+        )
+        await advancePistiBots(db, table.id, seats)
+      } else {
+        const prev = secretRes.data.state as RoundState
+        await startRound(db, table, seats, table.game_no, table.current_round + 1, nextSeat(prev.starter), 'round_end')
+      }
     } catch (err) {
-      // Another player already started the next round.
       if (err instanceof ApiError && err.code === 'BAD_STATE') return { ok: true }
       throw err
     }

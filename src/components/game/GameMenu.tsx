@@ -11,11 +11,12 @@ interface GameMenuProps {
   scoreLabel: string
   onScoreboard: () => void
   onLeave: () => void
+  rulesVariant?: 'okey' | 'pisti'
 }
 
 const ROW = 'flex h-11 w-full items-center gap-3 rounded-xl bg-white/6 px-3 text-sm font-bold ring-1 ring-white/8 transition hover:bg-white/12'
 
-export function GameMenu({ open, onClose, players, scoreLabel, onScoreboard, onLeave }: GameMenuProps) {
+export function GameMenu({ open, onClose, players, scoreLabel, onScoreboard, onLeave, rulesVariant = 'okey' }: GameMenuProps) {
   return (
     <Modal open={open} onClose={onClose} title="Masa" variant="side">
       <div className="flex flex-col gap-6">
@@ -35,7 +36,7 @@ export function GameMenu({ open, onClose, players, scoreLabel, onScoreboard, onL
           </button>
           <div className="flex gap-2">
             <SoundToggle showLabel />
-            <RulesButton showLabel />
+            <RulesButton showLabel variant={rulesVariant} />
           </div>
           <button type="button" onClick={onLeave} className={`${ROW} text-danger`}>
             <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>

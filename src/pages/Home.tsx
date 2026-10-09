@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { Lobby } from '@/components/lobby/Lobby'
 import { RulesButton } from '@/components/game/RulesModal'
 import { Logo } from '@/components/ui/Logo'
@@ -46,6 +47,12 @@ export function Home() {
       )}
 
       <Lobby />
+      <Link
+        to="/pisti"
+        className="mt-8 text-sm font-bold tracking-wider text-ivory-300 underline-offset-4 hover:text-accent-strong hover:underline"
+      >
+        Blöflü Pişti oyna →
+      </Link>
     </main>
   )
 }

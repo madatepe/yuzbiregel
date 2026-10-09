@@ -65,12 +65,12 @@ export function SeatSelector({ seats, mode, status, selected, onSelect, online }
                 name={seat?.nickname ?? ''}
                 size={36}
                 empty={available && !vacated}
-                offline={vacated || (seat && !online[seat.player_id])}
+                offline={vacated || (seat && !seat.is_bot && !!seat.player_id && !online[seat.player_id])}
               />
               <span className="flex max-w-full items-center gap-1 truncate text-xs font-bold">
                 {!available && (
                   <span
-                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${online[seat!.player_id] ? 'bg-success' : 'bg-ivory-400'}`}
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${seat?.is_bot || (seat?.player_id && online[seat.player_id]) ? 'bg-success' : 'bg-ivory-400'}`}
                     aria-hidden
                   />
                 )}

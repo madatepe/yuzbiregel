@@ -1,5 +1,7 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { GameEvent, PublicRoundState, TileId } from '@engine/index.ts'
+import type { PistiHandTiles, PublicPistiState } from '@pisti/index.ts'
+import { bindReactionChannel, ingestReaction, unbindReactionChannel, type ReactionBurst } from './reactions'
 import { supabase } from './supabase'
 import type { ScoreRow, SeatRow, TableRow } from './types'
 import { initialTableState, useTable } from '@/stores/table'
@@ -7,7 +9,7 @@ import { toast } from '@/stores/toast'
 
 interface PublicRow {
   table_id: string
-  state: PublicRoundState
+  state: PublicRoundState | PublicPistiState
   last_events: GameEvent[]
   version: number
 }
@@ -16,8 +18,25 @@ interface HandRow {
   table_id: string
   seat: number
   player_id: string
-  tiles: TileId[]
+  tiles: TileId[] | PistiHandTiles
   version: number
+}
+
+function withGameType(row: TableRow): TableRow {
+  return { ...row, game_type: row.game_type ?? 'okey101' }
+}
+
+function isPistiPub(state: unknown): state is PublicPistiState {
+  return !!state && typeof state === 'object' && (state as { kind?: string }).kind === 'pisti'
+}
+
+function parseHandTiles(tiles: unknown): { hand: TileId[]; pistiHand: PistiHandTiles | null } {
+  if (Array.isArray(tiles)) return { hand: tiles as TileId[], pistiHand: null }
+  if (tiles && typeof tiles === 'object' && Array.isArray((tiles as PistiHandTiles).cards)) {
+    const t = tiles as PistiHandTiles
+    return { hand: [], pistiHand: { cards: t.cards, peek: t.peek, pendingCard: t.pendingCard } }
+  }
+  return { hand: [], pistiHand: null }
 }
 
 const set = useTable.setState
@@ -25,8 +44,9 @@ const get = useTable.getState
 
 function applyTable(row: TableRow) {
   const prev = get().table
-  if (prev && prev.owner_id !== row.owner_id && row.status !== 'closed') toast('Masa sahibi değişti.', 'info')
-  set({ table: row })
+  const next = withGameType(row)
+  if (prev && prev.owner_id !== next.owner_id && next.status !== 'closed') toast('Masa sahibi değişti.', 'info')
+  set({ table: next })
   return prev
 }
 
@@ -34,9 +54,11 @@ function applyPublic(row: PublicRow | null) {
   if (!row) return
   const { version } = get()
   if (row.version < version) return
-  if (row.version === version && get().pub) return
+  if (row.version === version && (get().pub || get().pisti)) return
+  const pisti = isPistiPub(row.state)
   set((s) => ({
-    pub: row.state,
+    pub: pisti ? null : (row.state as PublicRoundState),
+    pisti: pisti ? (row.state as PublicPistiState) : null,
     version: row.version,
     events: row.last_events ?? [],
     eventSeq: s.eventSeq + 1,
@@ -46,7 +68,8 @@ function applyPublic(row: PublicRow | null) {
 function applyHand(row: HandRow | null, userId: string) {
   if (!row || row.player_id !== userId) return
   if (row.version < get().handVersion) return
-  set({ hand: row.tiles ?? [], handVersion: row.version })
+  const parsed = parseHandTiles(row.tiles)
+  set({ hand: parsed.hand, pistiHand: parsed.pistiHand, handVersion: row.version })
 }
 
 async function fetchSeats(tableId: string) {
@@ -78,14 +101,16 @@ async function fetchAll(tableId: string, userId: string): Promise<boolean> {
     set({ missing: true, loaded: true })
     return true
   }
-  const table = tableRes.data as TableRow
+  const table = withGameType(tableRes.data as TableRow)
   set({ table, seats: seatsRes.data as SeatRow[] })
   await fetchScores(tableId, table.game_no)
   // Force-accept the snapshot (it is the latest server truth after a reconnect).
   if (pubRes.data) {
     const row = pubRes.data as PublicRow
+    const pisti = isPistiPub(row.state)
     set((s) => ({
-      pub: row.state,
+      pub: pisti ? null : (row.state as PublicRoundState),
+      pisti: pisti ? (row.state as PublicPistiState) : null,
       version: row.version,
       events: s.version === row.version ? s.events : [],
       eventSeq: s.version === row.version ? s.eventSeq : s.eventSeq + 1,
@@ -93,9 +118,10 @@ async function fetchAll(tableId: string, userId: string): Promise<boolean> {
   }
   if (handRes.data) {
     const h = handRes.data as HandRow
-    set({ hand: h.tiles ?? [], handVersion: h.version })
+    const parsed = parseHandTiles(h.tiles)
+    set({ hand: parsed.hand, pistiHand: parsed.pistiHand, handVersion: h.version })
   } else {
-    set({ hand: [], handVersion: 0 })
+    set({ hand: [], pistiHand: null, handVersion: 0 })
   }
   set({ loaded: true })
   return true
@@ -152,6 +178,9 @@ export function connectTable(tableId: string, userId: string): () => void {
       for (const key of Object.keys(state)) online[key] = true
       set({ online })
     })
+    .on('broadcast', { event: 'reaction' }, ({ payload }) => {
+      ingestReaction(payload)
+    })
     .subscribe(async (status) => {
       if (disposed) return
       if (status === 'SUBSCRIBED') {
@@ -167,6 +196,16 @@ export function connectTable(tableId: string, userId: string): () => void {
         set({ connection: 'reconnecting' })
       }
     })
+
+  const publish = (burst: ReactionBurst) => {
+    if (disposed || channel?.state !== 'joined') return
+    void channel.send({
+      type: 'broadcast',
+      event: 'reaction',
+      payload: { id: burst.id, fromSeat: burst.fromSeat, toSeat: burst.toSeat, kind: burst.kind },
+    })
+  }
+  bindReactionChannel(publish)
 
   const onOffline = () => {
     wasDisconnected = true
@@ -189,6 +228,7 @@ export function connectTable(tableId: string, userId: string): () => void {
 
   return () => {
     disposed = true
+    unbindReactionChannel(publish)
     clearTimeout(retryTimer)
     window.removeEventListener('offline', onOffline)
     window.removeEventListener('online', onOnline)

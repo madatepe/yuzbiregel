@@ -1,5 +1,5 @@
 import { ApiError, cleanNickname, handler, str } from '../_shared/http.ts'
-import { loadSeats, touchTable, type TableRow } from '../_shared/tables.ts'
+import { isBotSeat, loadSeats, touchTable, type TableRow } from '../_shared/tables.ts'
 
 Deno.serve(
   handler(async ({ db, user, body }) => {
@@ -34,6 +34,7 @@ Deno.serve(
     }
 
     const target = seats.find((s) => s.seat === seatNo)
+    if (target && isBotSeat(target)) throw new ApiError('SEAT_TAKEN')
     if (table.status === 'waiting') {
       if (target) throw new ApiError(seats.length >= 4 ? 'TABLE_FULL' : 'SEAT_TAKEN')
       const { error: e } = await db

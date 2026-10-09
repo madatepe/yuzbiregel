@@ -1,6 +1,43 @@
 import { useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
 
+const PISTI_SECTIONS: { title: string; items: string[] }[] = [
+  {
+    title: 'Dağıtım',
+    items: [
+      '52 kart, joker yok. Herkese 4 kart; masaya 1 açık + 3 kapalı konur.',
+      'Oyun dağıtıcının sağından başlar. Karşılıklı oturanlar takımdır.',
+      'Açık kartı ilk toplayan takım, alttaki 3 kapalı kartı bir kez görür.',
+    ],
+  },
+  {
+    title: 'Normal oyun',
+    items: [
+      'Sırayla elinden bir kart atarsın. Üstteki kartla aynı değerdeyse veya Vale (J) ise yeri alırsın.',
+      'Yerde tek kart varken eşleşme veya Vale Pişti’dir: 10 puan, yer 5 ise 50 puan.',
+      'Eller bitince 4’er kart daha dağıtılır. Deste bitince yerde kalan son toplayana gider.',
+    ],
+  },
+  {
+    title: 'Kapalı kart ve blöf',
+    items: [
+      'Yerde tam 1 kart varken kapalı atmak otomatik Pişti iddiasıdır.',
+      'Sıradaki rakip İnan veya Blöf de diyebilir.',
+      'İnanılırsa kart açılmaz; iddia eden takım 10 (yer 5 ise 50) alır.',
+      'Blöf denir ve sahteyse yakalayan takım 10 alır, kart açık yerde kalır.',
+      'Gerçek Piştiye blöf denirse iddia eden 20 (yer 5 ise 100) alır.',
+    ],
+  },
+  {
+    title: 'Puanlar ve bitiş',
+    items: [
+      'Sinek 2: 2, Karo 10: 3, her As ve Vale: 1. En çok kart: 3 (eşitlikte 0).',
+      'Pişti puanları el sonunda kart puanlarıyla toplanır.',
+      'Toplam 205 puana ulaşan takım kazanır.',
+    ],
+  },
+]
+
 const SECTIONS: { title: string; items: string[] }[] = [
   {
     title: 'Oyunun amacı',
@@ -38,6 +75,8 @@ const SECTIONS: { title: string; items: string[] }[] = [
     items: [
       'Sıran gelince desteden taş çekersin ya da önceki oyuncunun attığı taşı alırsın.',
       'Yerden aldığın taşı aynı el kullanmalısın (açarak ya da işleyerek). Kullanamazsan geri bırakırsın ve +101 ceza yazılır.',
+      'Bir pere okeyin tuttuğu gerçek taşı işlersen okey eline geçer; sonra bir taş atman gerekir.',
+      '1 yalnızca 1-2-3 tarafına işlenir. 13’ün yanına 1 işlenemez (12-13-1 sadece per olarak açılır).',
     ],
   },
   {
@@ -68,11 +107,20 @@ const SECTIONS: { title: string; items: string[] }[] = [
   },
 ]
 
-export function RulesModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function RulesModal({
+  open,
+  onClose,
+  variant = 'okey',
+}: {
+  open: boolean
+  onClose: () => void
+  variant?: 'okey' | 'pisti'
+}) {
+  const sections = variant === 'pisti' ? PISTI_SECTIONS : SECTIONS
   return (
     <Modal open={open} onClose={onClose} title="Oyun kuralları" size="lg">
       <div className="flex flex-col gap-5">
-        {SECTIONS.map((s) => (
+        {sections.map((s) => (
           <section key={s.title}>
             <h3 className="mb-1.5 text-sm font-extrabold tracking-wider text-accent-strong uppercase">{s.title}</h3>
             <ul className="flex flex-col gap-1 text-[15px] leading-relaxed text-ivory-200">
@@ -90,7 +138,15 @@ export function RulesModal({ open, onClose }: { open: boolean; onClose: () => vo
   )
 }
 
-export function RulesButton({ className = '', showLabel = false }: { className?: string; showLabel?: boolean }) {
+export function RulesButton({
+  className = '',
+  showLabel = false,
+  variant = 'okey',
+}: {
+  className?: string
+  showLabel?: boolean
+  variant?: 'okey' | 'pisti'
+}) {
   const [open, setOpen] = useState(false)
   return (
     <>
@@ -105,7 +161,7 @@ export function RulesButton({ className = '', showLabel = false }: { className?:
         </span>
         <span className={showLabel ? '' : 'hidden sm:inline'}>OYUN KURALLARI</span>
       </button>
-      <RulesModal open={open} onClose={() => setOpen(false)} />
+      <RulesModal open={open} onClose={() => setOpen(false)} variant={variant} />
     </>
   )
 }

@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import type { OpenKind } from '@engine/index.ts'
+import { useReactionActions } from '@/components/game/ReactionLayer'
 import { PlayerAvatar } from '@/components/ui/PlayerAvatar'
 import type { SeatInfo, SeatSide } from '@/hooks/useGameView'
 
@@ -16,11 +17,37 @@ interface PlayerSeatProps {
 }
 
 function StatusLine({ info }: { info: SeatInfo }) {
+  if (info.isBot) return <span className="text-accent-strong">● Bot</span>
   if (info.left) return <span className="text-warning">○ Ayrıldı</span>
   return info.online ? (
     <span className="text-success">● Çevrimiçi</span>
   ) : (
     <span className="text-ivory-400">○ Bağlantı yok</span>
+  )
+}
+
+function SeatFace({ info, size, active }: { info: SeatInfo; size: number; active: boolean }) {
+  const actions = useReactionActions()
+  const avatar = <PlayerAvatar name={info.nickname} size={size} active={active} offline={info.left || !info.online} />
+  const face =
+    !actions || info.left || info.seat === actions.mySeat ? (
+      avatar
+    ) : (
+      <button
+        type="button"
+        data-reaction-trigger
+        title="Tepki gönder"
+        aria-label={`${info.nickname} adlı oyuncuya tepki gönder`}
+        onClick={(e) => actions.openPicker(info.seat, e.currentTarget)}
+        className="shrink-0 cursor-pointer rounded-full ring-2 ring-transparent transition hover:ring-accent/80 focus-visible:ring-accent focus-visible:outline-none"
+      >
+        {avatar}
+      </button>
+    )
+  return (
+    <span data-anchor={`face-${info.seat}`} className="inline-flex">
+      {face}
+    </span>
   )
 }
 
@@ -35,7 +62,7 @@ function PlayerSeatImpl({ info, side, active, handCount, opened, total, penalty,
         className={`relative flex min-w-0 flex-1 items-center gap-2 rounded-xl px-2 py-1.5 transition-all duration-300 ${active ? 'bg-accent/15 ring-2 ring-accent' : 'bg-black/25 ring-1 ring-white/8'}`}
         aria-label={`${info.nickname}, ${handCount} taş, toplam ${total}${active ? ', sıra onda' : ''}`}
       >
-        <PlayerAvatar name={info.nickname} size={30} active={active} offline={info.left || !info.online} />
+        <SeatFace info={info} size={30} active={active} />
         <div className="min-w-0 flex-1 leading-tight">
           <div className="flex items-center gap-1 truncate text-xs font-bold">
             {info.isOwner && <span aria-hidden>👑</span>}
@@ -45,6 +72,7 @@ function PlayerSeatImpl({ info, side, active, handCount, opened, total, penalty,
             <span>{handCount} taş</span>
             <span aria-hidden>·</span>
             <span className="tabular-nums">{total}</span>
+            {penalty > 0 && <span className="rounded bg-accent/20 px-1 text-accent-strong">+{penalty}</span>}
             {opened && <span className="rounded bg-success/20 px-1 text-success">{opened === 'pairs' ? 'ÇİFT' : 'AÇTI'}</span>}
           </div>
         </div>
@@ -64,7 +92,7 @@ function PlayerSeatImpl({ info, side, active, handCount, opened, total, penalty,
           SIRA ONDA
         </span>
       )}
-      <PlayerAvatar name={info.nickname} size={vertical ? 52 : 46} active={active} offline={info.left || !info.online} />
+      <SeatFace info={info} size={vertical ? 52 : 46} active={active} />
       <div className={`flex min-w-0 flex-col gap-0.5 ${vertical ? 'items-center' : ''}`}>
         <div className="flex max-w-36 items-center gap-1 truncate font-extrabold">
           {info.isOwner && (
@@ -81,7 +109,9 @@ function PlayerSeatImpl({ info, side, active, handCount, opened, total, penalty,
         <div className="flex items-center gap-1.5 text-xs">
           <span className="text-ivory-400">Toplam</span>
           <span className="font-bold tabular-nums">{total}</span>
-          {penalty > 0 && <span className="rounded bg-danger/20 px-1 text-[10px] font-bold text-danger">+{penalty}</span>}
+          {penalty > 0 && (
+            <span className="rounded bg-accent/20 px-1 text-[10px] font-bold text-accent-strong">+{penalty}</span>
+          )}
         </div>
         {opened && (
           <span className="w-fit rounded-md bg-success/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-success">

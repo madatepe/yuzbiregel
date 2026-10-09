@@ -12,6 +12,7 @@ const MESSAGES: Record<string, string> = {
   BAD_STATE: 'Bu hamleyi şu anda yapamazsın.',
   CONFLICT: 'Masa güncellendi, tekrar dene.',
   INTERNAL: 'Bir şeyler ters gitti. Tekrar dene.',
+  SCHEMA_REQUIRED: 'Sunucu şeması güncel değil. Terminalde npm run db:push ve npm run functions:deploy çalıştır.',
   NETWORK: 'Bağlantı yeniden kuruluyor.',
   // Game engine
   NOT_YOUR_TURN: 'Sıra sende değil.',
@@ -32,6 +33,11 @@ const MESSAGES: Record<string, string> = {
   MELD_NOT_FOUND: 'Per bulunamadı.',
   ROUND_OVER: 'El bitti.',
   UNKNOWN_ACTION: 'Bu hamleyi şu anda yapamazsın.',
+  CARD_NOT_IN_HAND: 'Bu kart elinde değil.',
+  CANNOT_PLAY_CLOSED: 'Kapalı kart yalnızca yerde tek kart varken atılır.',
+  NOT_BLUFF_RESPONDER: 'Blöf kararı sıradaki rakibe ait.',
+  DEAL_OVER: 'El bitti.',
+  NO_PEEK: 'Görecek kapalı kart kalmadı.',
 }
 
 export class AppError extends Error {
@@ -42,12 +48,21 @@ export class AppError extends Error {
   }
 }
 
+function codeOf(err: unknown): string | null {
+  if (err instanceof AppError) return err.code
+  if (typeof err === 'string') return err
+  if (err && typeof err === 'object' && 'code' in err && typeof (err as { code: unknown }).code === 'string') {
+    return (err as { code: string }).code
+  }
+  return null
+}
+
 export function errorMessage(err: unknown): string {
-  if (err instanceof AppError) return MESSAGES[err.code] ?? MESSAGES.INTERNAL
-  if (typeof err === 'string') return MESSAGES[err] ?? MESSAGES.INTERNAL
+  const code = codeOf(err)
+  if (code) return MESSAGES[code] ?? MESSAGES.INTERNAL
   return MESSAGES.INTERNAL
 }
 
 export function errorCode(err: unknown): string {
-  return err instanceof AppError ? err.code : 'INTERNAL'
+  return codeOf(err) ?? 'INTERNAL'
 }

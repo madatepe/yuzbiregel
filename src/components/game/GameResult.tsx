@@ -17,16 +17,17 @@ interface GameResultProps {
   busy: 'restart' | 'leave' | null
   onRestart: () => void
   onLeave: () => void
+  higherWins?: boolean
 }
 
 const MEDALS = ['🥇', '🥈', '🥉', '']
 
-export function GameResult({ open, seats, totals, mode, mySeat, isOwner, busy, onRestart, onLeave }: GameResultProps) {
-  const order = [0, 1, 2, 3].sort((a, b) => totals[a] - totals[b])
+export function GameResult({ open, seats, totals, mode, mySeat, isOwner, busy, onRestart, onLeave, higherWins = false }: GameResultProps) {
+  const order = [0, 1, 2, 3].sort((a, b) => (higherWins ? totals[b] - totals[a] : totals[a] - totals[b]))
   // Equal totals share a rank (competition ranking: 1, 1, 3, 4).
-  const rankOf = (seat: number) => totals.filter((t) => t < totals[seat]).length
+  const rankOf = (seat: number) => totals.filter((t) => (higherWins ? t > totals[seat] : t < totals[seat])).length
   const teams = teamTotals(totals)
-  const winningTeam = teams[0] === teams[1] ? null : teams[0] < teams[1] ? 0 : 1
+  const winningTeam = teams[0] === teams[1] ? null : higherWins ? (teams[0] > teams[1] ? 0 : 1) : teams[0] < teams[1] ? 0 : 1
   const soloWinners = order.filter((s) => rankOf(s) === 0)
   const iWon =
     mode === 'team' ? winningTeam !== null && mySeat % 2 === winningTeam : soloWinners.length === 1 && soloWinners[0] === mySeat

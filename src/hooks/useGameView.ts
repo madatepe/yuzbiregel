@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useSession } from '@/stores/session'
+import { LOCAL_PISTI_ID } from '@/lib/pistiLocal'
 import { mySeatOf, useTable } from '@/stores/table'
 import type { ScoreRow } from '@/lib/types'
 
@@ -13,7 +14,7 @@ export function sideOf(seat: number, mySeat: number): SeatSide {
 
 export function useMySeat(): number {
   const userId = useSession((s) => s.userId)
-  return useTable((s) => mySeatOf(s.seats, userId)?.seat ?? 0)
+  return useTable((s) => (s.tableId === LOCAL_PISTI_ID ? 0 : mySeatOf(s.seats, userId)?.seat ?? 0))
 }
 
 export function totalsFrom(scores: ScoreRow[]): number[] {
@@ -34,6 +35,7 @@ export interface SeatInfo {
   left: boolean
   online: boolean
   isOwner: boolean
+  isBot: boolean
 }
 
 export function useSeatInfos(): SeatInfo[] {
@@ -44,13 +46,15 @@ export function useSeatInfos(): SeatInfo[] {
     () =>
       [0, 1, 2, 3].map((i) => {
         const row = seats.find((x) => x.seat === i)
+        const isBot = !!row?.is_bot || !!row?.nickname?.startsWith('Bot ')
         return {
           seat: i,
           nickname: row?.nickname ?? `Oyuncu ${i + 1}`,
           playerId: row?.player_id ?? null,
           left: !row || !!row.left_at,
-          online: !!row && !row.left_at && !!online[row.player_id],
-          isOwner: !!row && row.player_id === ownerId,
+          online: isBot || (!!row && !row.left_at && !!row.player_id && !!online[row.player_id]),
+          isOwner: !!row && !!row.player_id && row.player_id === ownerId,
+          isBot,
         }
       }),
     [seats, online, ownerId],

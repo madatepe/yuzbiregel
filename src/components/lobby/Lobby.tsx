@@ -4,6 +4,8 @@ import { ActionButton } from '@/components/ui/ActionButton'
 import { NicknameField, validNickname } from './NicknameField'
 import { api } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
+import type { GameKind } from '@/lib/gameKind'
+import { tablePath } from '@/lib/gameKind'
 import { playSound } from '@/lib/sound'
 import { useSession } from '@/stores/session'
 import { toast } from '@/stores/toast'
@@ -15,9 +17,14 @@ const MODES: { id: Mode; title: string; sub: string; icon: string }[] = [
   { id: 'team', title: 'EŞLİ', sub: 'Karşılıklı oturanlar takım', icon: '👥' },
 ]
 
+const PISTI_MODES: { id: Mode; title: string; sub: string; icon: string }[] = [
+  { id: 'solo', title: 'TEKLİ', sub: 'Sen + 3 bot. Tek başına dene', icon: '🤖' },
+  { id: 'team', title: 'EŞLİ', sub: '4 oyuncu, karşılıklı takımlar', icon: '👥' },
+]
+
 const ROUNDS = [1, 6, 11] as const
 
-export function Lobby() {
+export function Lobby({ game = 'okey101' }: { game?: GameKind }) {
   const navigate = useNavigate()
   const nickname = useSession((s) => s.nickname)
   const ready = useSession((s) => s.ready && !s.error)
@@ -38,11 +45,20 @@ export function Lobby() {
 
   const create = async () => {
     if (!checkNick()) return
+    if (game === 'pisti' && mode === 'solo') {
+      playSound('open')
+      navigate('/pisti/tekli')
+      return
+    }
     setBusy(true)
     try {
-      const res = await api.createTable({ nickname: nickname.trim(), mode, rounds })
+      const res = await api.createTable(
+        game === 'pisti'
+          ? { nickname: nickname.trim(), gameType: 'pisti', mode, rounds: 1 }
+          : { nickname: nickname.trim(), mode, rounds, gameType: 'okey101' },
+      )
       playSound('open')
-      navigate(`/masa/${res.code}`)
+      navigate(tablePath(res.code, game))
     } catch (err) {
       toast(errorMessage(err), 'error')
     } finally {
@@ -58,7 +74,7 @@ export function Lobby() {
       playSound('invalid')
       return
     }
-    navigate(`/masa/${clean}`)
+    navigate(tablePath(clean, game))
   }
 
   return (
@@ -83,6 +99,49 @@ export function Lobby() {
 
       {tab === 'create' ? (
         <div className="flex flex-col gap-6 animate-fade-up">
+          {game === 'pisti' && (
+            <>
+              <fieldset>
+                <legend className="mb-2 text-xs font-bold tracking-[0.2em] text-ivory-300">OYUN TÜRÜ</legend>
+                <div className="grid grid-cols-2 gap-3">
+                  {PISTI_MODES.map((m) => {
+                    const active = mode === m.id
+                    return (
+                      <label
+                        key={m.id}
+                        className={`relative flex cursor-pointer flex-col items-center gap-1 rounded-2xl border-2 p-4 text-center transition-all duration-200 ${active ? 'border-accent bg-accent/10 shadow-[0_0_0_4px_rgb(246_185_59/0.12)]' : 'border-white/10 bg-black/20 hover:border-white/25'}`}
+                      >
+                        <input
+                          type="radio"
+                          name="pisti-mode"
+                          className="sr-only"
+                          checked={active}
+                          onChange={() => setMode(m.id)}
+                        />
+                        <span className="text-2xl" aria-hidden>
+                          {m.icon}
+                        </span>
+                        <span className="font-extrabold tracking-wide">{m.title}</span>
+                        <span className="text-xs text-ivory-300">{m.sub}</span>
+                        {active && (
+                          <span className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-xs font-black text-accent-ink" aria-hidden>
+                            ✓
+                          </span>
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+              </fieldset>
+              <p className="text-center text-sm text-ivory-300">
+                {mode === 'solo'
+                  ? 'Masayı oluşturunca oyun hemen başlar. Partnerin ve rakipler bot.'
+                  : '4 oyuncu, karşılıklı eşler. İlk 205 puana ulaşan takım kazanır.'}
+              </p>
+            </>
+          )}
+          {game === 'okey101' && (
+          <>
           <fieldset>
             <legend className="mb-2 text-xs font-bold tracking-[0.2em] text-ivory-300">OYUN TÜRÜ</legend>
             <div className="grid grid-cols-2 gap-3">
@@ -137,8 +196,16 @@ export function Lobby() {
               })}
             </div>
           </fieldset>
+          </>
+          )}
 
-          <ActionButton size="lg" block onClick={create} loading={busy} disabled={!ready}>
+          <ActionButton
+            size="lg"
+            block
+            onClick={create}
+            loading={busy}
+            disabled={game === 'pisti' && mode === 'solo' ? busy : !ready}
+          >
             Masa oluştur
           </ActionButton>
         </div>

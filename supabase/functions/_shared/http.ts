@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { GameError } from './engine/index.ts'
+import { PistiError } from './pisti/index.ts'
 
 export type ApiErrorCode =
   | 'UNAUTHORIZED'
@@ -14,6 +15,7 @@ export type ApiErrorCode =
   | 'BAD_STATE'
   | 'CONFLICT'
   | 'INTERNAL'
+  | 'SCHEMA_REQUIRED'
 
 export class ApiError extends Error {
   code: string
@@ -66,7 +68,7 @@ export function handler(fn: (ctx: Ctx) => Promise<unknown>) {
       return json(result ?? { ok: true })
     } catch (err) {
       if (err instanceof ApiError) return json({ error: { code: err.code } }, err.status)
-      if (err instanceof GameError) return json({ error: { code: err.code } }, 400)
+      if (err instanceof GameError || err instanceof PistiError) return json({ error: { code: err.code } }, 400)
       const message = err instanceof Error ? err.message : String(err)
       if (message.includes('VERSION_CONFLICT')) return json({ error: { code: 'CONFLICT' } }, 409)
       console.error(err)

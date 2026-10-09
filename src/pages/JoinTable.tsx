@@ -6,6 +6,7 @@ import { ActionButton } from '@/components/ui/ActionButton'
 import { ConnectionStatus } from '@/components/ui/ConnectionStatus'
 import { api } from '@/lib/api'
 import { errorCode, errorMessage } from '@/lib/errors'
+import { homePath } from '@/lib/gameKind'
 import { playSound } from '@/lib/sound'
 import { useSession } from '@/stores/session'
 import { useTable } from '@/stores/table'
@@ -42,7 +43,7 @@ export function JoinTable() {
       playSound('open')
     } catch (err) {
       toast(errorMessage(err), 'error')
-      if (errorCode(err) === 'TABLE_CLOSED' || errorCode(err) === 'TABLE_NOT_FOUND') navigate('/')
+      if (errorCode(err) === 'TABLE_CLOSED' || errorCode(err) === 'TABLE_NOT_FOUND') navigate(homePath(table.game_type))
     } finally {
       setBusy(false)
     }
@@ -54,16 +55,19 @@ export function JoinTable() {
     <main className="flex min-h-full flex-col items-center px-4 py-8">
       <div className="flex w-full max-w-md flex-col gap-2 rounded-3xl border border-line bg-surface/85 p-6 shadow-2xl backdrop-blur animate-fade-up">
         <div className="flex items-center justify-between">
-          <button type="button" onClick={() => navigate('/')} className="text-sm font-semibold text-ivory-300 hover:text-ivory-50">
+          <button type="button" onClick={() => navigate(homePath(table.game_type))} className="text-sm font-semibold text-ivory-300 hover:text-ivory-50">
             ← Ana sayfa
           </button>
           <ConnectionStatus compact />
         </div>
         <div className="mt-2 text-center">
-          <h1 className="text-2xl font-black tracking-wider">101 MASASI</h1>
+          <h1 className="text-2xl font-black tracking-wider">{table.game_type === 'pisti' ? 'PİŞTİ MASASI' : '101 MASASI'}</h1>
           <p className="text-sm text-ivory-300">
             Kod <span className="font-bold tracking-widest text-ivory-50">{table.code}</span> ·{' '}
-            {table.mode === 'team' ? 'EŞLİ' : 'HERKES TEK'} · {table.total_rounds} EL · {statusLabel}
+            {table.game_type === 'pisti'
+              ? 'EŞLİ · 205 PUAN'
+              : `${table.mode === 'team' ? 'EŞLİ' : 'HERKES TEK'} · ${table.total_rounds} EL`}{' '}
+            · {statusLabel}
           </p>
         </div>
 

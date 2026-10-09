@@ -1,19 +1,24 @@
 import { useState } from 'react'
 import { ActionButton } from '@/components/ui/ActionButton'
+import type { GameKind } from '@/lib/gameKind'
+import { tablePath } from '@/lib/gameKind'
 import { toast } from '@/stores/toast'
+import { useTable } from '@/stores/table'
 
-export function tableUrl(code: string) {
-  return new URL(`/masa/${code}`, window.location.origin).toString()
+export function tableUrl(code: string, kind: GameKind = 'okey101') {
+  return new URL(tablePath(code, kind), window.location.origin).toString()
 }
 
-export function whatsappShareUrl(code: string) {
-  const text = `101 Okey masama gel! 🎲\nMasa kodu: ${code}\n${tableUrl(code)}`
+export function whatsappShareUrl(code: string, kind: GameKind = 'okey101') {
+  const title = kind === 'pisti' ? 'Blöflü Pişti masama gel!' : '101 Okey masama gel! 🎲'
+  const text = `${title}\nMasa kodu: ${code}\n${tableUrl(code, kind)}`
   const url = new URL('https://wa.me/')
   url.searchParams.set('text', text)
   return url.toString()
 }
 
 export function TableCode({ code, compact = false }: { code: string; compact?: boolean }) {
+  const kind = useTable((s) => s.table?.game_type) ?? 'okey101'
   const [copied, setCopied] = useState(false)
 
   const copy = async () => {
@@ -47,7 +52,7 @@ export function TableCode({ code, compact = false }: { code: string; compact?: b
           {copied ? '✓ Kopyalandı' : 'Kodu kopyala'}
         </ActionButton>
         <a
-          href={whatsappShareUrl(code)}
+          href={whatsappShareUrl(code, kind)}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#25d366] px-3 text-sm font-bold tracking-wide text-[#05301a] uppercase shadow-[0_3px_0_#14964a] transition hover:brightness-105 active:translate-y-[2px] active:shadow-none"

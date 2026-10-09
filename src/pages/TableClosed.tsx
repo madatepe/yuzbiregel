@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { ActionButton } from '@/components/ui/ActionButton'
 
 const COPY = {
@@ -9,6 +9,7 @@ const COPY = {
 
 export function TableClosed({ reason }: { reason: keyof typeof COPY }) {
   const navigate = useNavigate()
+  const pisti = useLocation().pathname.startsWith('/pisti')
   const c = COPY[reason]
   return (
     <main className="flex min-h-full items-center justify-center p-4">
@@ -19,7 +20,7 @@ export function TableClosed({ reason }: { reason: keyof typeof COPY }) {
         </div>
         <h1 className="text-2xl font-black tracking-wider">{c.title}</h1>
         <p className="text-ivory-300">{c.body}</p>
-        <ActionButton onClick={() => navigate('/')} block>
+        <ActionButton onClick={() => navigate(pisti ? '/pisti' : '/')} block>
           Ana sayfaya dön
         </ActionButton>
       </div>

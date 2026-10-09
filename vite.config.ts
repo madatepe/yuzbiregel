@@ -9,6 +9,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@engine': fileURLToPath(new URL('./supabase/functions/_shared/engine', import.meta.url)),
+      '@pisti': fileURLToPath(new URL('./supabase/functions/_shared/pisti', import.meta.url)),
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },

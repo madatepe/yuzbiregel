@@ -17,6 +17,7 @@
     "jsx": "react-jsx",
     "paths": {
       "@engine/*": ["./supabase/functions/_shared/engine/*"],
+      "@pisti/*": ["./supabase/functions/_shared/pisti/*"],
       "@/*": ["./src/*"]
     },
 
@@ -27,5 +28,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "supabase/functions/_shared/engine", "tests"]
+  "include": ["src", "supabase/functions/_shared/engine", "supabase/functions/_shared/pisti", "tests"]
 }

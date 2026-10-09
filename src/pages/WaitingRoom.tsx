@@ -10,6 +10,7 @@ import { PlayerAvatar } from '@/components/ui/PlayerAvatar'
 import { SoundToggle } from '@/components/ui/SoundToggle'
 import { api } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
+import { homePath } from '@/lib/gameKind'
 import { playSound } from '@/lib/sound'
 import { useSession } from '@/stores/session'
 import { useTable } from '@/stores/table'
@@ -36,7 +37,7 @@ export function WaitingRoom() {
         playSound('open')
       } else if (kind === 'leave') {
         await api.leaveTable(table.id)
-        navigate('/')
+        navigate(homePath(table.game_type))
       } else {
         await api.closeTable(table.id)
       }
@@ -55,7 +56,7 @@ export function WaitingRoom() {
         <ConnectionStatus />
         <div className="flex items-center gap-2">
           <SoundToggle />
-          <RulesButton />
+          <RulesButton variant={table.game_type === 'pisti' ? 'pisti' : 'okey'} />
         </div>
       </div>
 
@@ -83,7 +84,12 @@ export function WaitingRoom() {
                       transition={{ duration: 0.2 }}
                       className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 ${seat ? 'bg-black/25 ring-1 ring-white/8' : 'border-2 border-dashed border-white/10'}`}
                     >
-                      <PlayerAvatar name={seat?.nickname ?? ''} size={40} empty={!seat} offline={seat && !online[seat.player_id]} />
+                      <PlayerAvatar
+                        name={seat?.nickname ?? ''}
+                        size={40}
+                        empty={!seat}
+                        offline={!!seat && !seat.is_bot && !(seat.player_id && online[seat.player_id])}
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 truncate font-bold">
                           {seat ? seat.nickname : <span className="font-medium text-ivory-400">Bekleniyor...</span>}
@@ -99,8 +105,8 @@ export function WaitingRoom() {
                           {table.mode === 'team' && ` · Takım ${(i % 2) + 1}`}
                         </div>
                         {seat && (
-                          <div className={`text-xs ${online[seat.player_id] ? 'text-success' : 'text-ivory-400'}`}>
-                            {online[seat.player_id] ? '● Çevrimiçi' : '○ Bağlantı yok'}
+                          <div className={`text-xs ${seat.is_bot ? 'text-accent-strong' : online[seat.player_id ?? ''] ? 'text-success' : 'text-ivory-400'}`}>
+                            {seat.is_bot ? '● Bot' : online[seat.player_id ?? ''] ? '● Çevrimiçi' : '○ Bağlantı yok'}
                           </div>
                         )}
                       </div>
@@ -115,12 +121,22 @@ export function WaitingRoom() {
         <div className="flex w-full justify-center gap-6 rounded-2xl bg-black/20 py-3 text-center">
           <div>
             <div className="text-[11px] font-bold tracking-[0.2em] text-ivory-400">OYUN</div>
-            <div className="font-extrabold">{table.mode === 'team' ? 'EŞLİ' : 'HERKES TEK'}</div>
+            <div className="font-extrabold">
+              {table.game_type === 'pisti'
+                ? table.mode === 'solo'
+                  ? 'TEKLİ (BOTLAR)'
+                  : 'EŞLİ'
+                : table.mode === 'team'
+                  ? 'EŞLİ'
+                  : 'HERKES TEK'}
+            </div>
           </div>
           <div className="w-px bg-white/10" />
           <div>
-            <div className="text-[11px] font-bold tracking-[0.2em] text-ivory-400">EL SAYISI</div>
-            <div className="font-extrabold">{table.total_rounds} EL</div>
+            <div className="text-[11px] font-bold tracking-[0.2em] text-ivory-400">
+              {table.game_type === 'pisti' ? 'HEDEF' : 'EL SAYISI'}
+            </div>
+            <div className="font-extrabold">{table.game_type === 'pisti' ? '205 PUAN' : `${table.total_rounds} EL`}</div>
           </div>
         </div>
 
