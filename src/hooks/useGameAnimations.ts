@@ -74,6 +74,12 @@ export function useGameAnimations(mySeat: number) {
           const target = tileEl(`[data-anchor="meld-${meldId}"]`, e.tile)
           const from = (mine ? takeRemembered(e.tile) : null) ?? seatAnchor
           if (target && from) flyTo({ target, from, duration: 440 })
+          if (e.taken !== undefined) {
+            const jokerTarget = mine ? tileEl('[data-rack]', e.taken) : null
+            const jokerFrom = anchorRect(`meld-${meldId}`) ?? seatAnchor
+            if (jokerTarget && jokerFrom) flyTo({ target: jokerTarget, from: jokerFrom, duration: 480 })
+            else if (!mine && jokerFrom && seatAnchor) flyBetween(jokerFrom, seatAnchor)
+          }
           break
         }
         case 'TURN_CHANGED':

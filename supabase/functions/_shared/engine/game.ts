@@ -91,6 +91,8 @@ export interface GameEvent {
   type: GameEventType
   seat: number
   tile?: TileId
+  /** Joker returned to the attaching player's hand. */
+  taken?: TileId
   meldIds?: number[]
   penalty?: number
   penaltyReason?: 'okey' | 'processable' | 'returned'
@@ -323,12 +325,20 @@ export function applyAction(input: RoundState, seat: number, action: GameAction)
       assertInHand(hand, [action.tile])
       const meld = state.melds.find((m) => m.id === action.meldId)
       if (!meld) throw new GameError('MELD_NOT_FOUND')
-      const tiles = tryAttach(meld, action.tile, state.okey)
-      if (!tiles) throw new GameError('CANNOT_ATTACH')
+      const attached = tryAttach(meld, action.tile, state.okey)
+      if (!attached) throw new GameError('CANNOT_ATTACH')
       removeFromHand(hand, [action.tile])
+      if (attached.takenJoker !== null) hand.push(attached.takenJoker)
       afterTilesLeftHand(state, seat, [action.tile])
-      meld.tiles = tiles
-      events.push({ type: 'TILE_ADDED', seat, tile: action.tile, meldIds: [meld.id], at })
+      meld.tiles = attached.tiles
+      events.push({
+        type: 'TILE_ADDED',
+        seat,
+        tile: action.tile,
+        taken: attached.takenJoker ?? undefined,
+        meldIds: [meld.id],
+        at,
+      })
       break
     }
     case 'discard': {

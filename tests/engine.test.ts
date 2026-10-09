@@ -95,11 +95,48 @@ describe('pairs', () => {
 describe('attach', () => {
   it('extends runs and sets', () => {
     const run = { id: 1, owner: 0, kind: 'run' as const, tiles: [t('red', 3), t('red', 4), t('red', 5)] }
-    expect(tryAttach(run, t('red', 6), okey)).toEqual([t('red', 3), t('red', 4), t('red', 5), t('red', 6)])
+    expect(tryAttach(run, t('red', 6), okey)).toEqual({
+      tiles: [t('red', 3), t('red', 4), t('red', 5), t('red', 6)],
+      takenJoker: null,
+    })
     expect(tryAttach(run, t('red', 8), okey)).toBeNull()
     const set = { id: 2, owner: 0, kind: 'set' as const, tiles: [t('red', 7), t('blue', 7), t('black', 7)] }
-    expect(tryAttach(set, t('yellow', 7), okey)).not.toBeNull()
+    expect(tryAttach(set, t('yellow', 7), okey)?.takenJoker).toBeNull()
     expect(tryAttach(set, t('red', 7, 1), okey)).toBeNull()
+  })
+
+  it('returns the joker when its gap is filled', () => {
+    const run = { id: 1, owner: 0, kind: 'run' as const, tiles: [t('red', 10), J, t('red', 12), t('red', 13)] }
+    const result = tryAttach(run, t('red', 11), okey)
+    expect(result?.tiles).toEqual([t('red', 10), t('red', 11), t('red', 12), t('red', 13)])
+    expect(result?.takenJoker).toBe(J)
+    expect(tryAttach(run, t('red', 9), okey)).toEqual({
+      tiles: [t('red', 9), t('red', 10), J, t('red', 12), t('red', 13)],
+      takenJoker: null,
+    })
+  })
+
+  it('does not let 1 attach after 13', () => {
+    const run = { id: 1, owner: 0, kind: 'run' as const, tiles: [t('red', 11), t('red', 12), t('red', 13)] }
+    expect(tryAttach(run, t('red', 1), okey)).toBeNull()
+    const wrap = { id: 2, owner: 0, kind: 'run' as const, tiles: [t('red', 12), t('red', 13), t('red', 1)] }
+    expect(tryAttach(wrap, t('red', 11), okey)).toBeNull()
+    const low = { id: 3, owner: 0, kind: 'run' as const, tiles: [t('red', 2), t('red', 3), t('red', 4)] }
+    expect(tryAttach(low, t('red', 1), okey)?.tiles[0]).toBe(t('red', 1))
+  })
+
+  it('takes the joker from a full set when the missing color is played', () => {
+    const full = {
+      id: 1,
+      owner: 0,
+      kind: 'set' as const,
+      tiles: [t('red', 7), t('blue', 7), t('black', 7), J],
+    }
+    const result = tryAttach(full, t('yellow', 7), okey)
+    expect(result?.takenJoker).toBe(J)
+    expect(result?.tiles).toHaveLength(4)
+    const open = { id: 2, owner: 0, kind: 'set' as const, tiles: [t('red', 7), t('blue', 7), J] }
+    expect(tryAttach(open, t('black', 7), okey)?.takenJoker).toBeNull()
   })
 })
 
@@ -153,6 +190,18 @@ describe('round flow', () => {
     expect(f.state.result?.elden).toBe(true)
     expect(f.state.result?.scores[0]).toBe(-404)
     expect(f.state.result?.scores[1]).toBe(808)
+  })
+
+  it('gives the displaced joker to the attaching player', () => {
+    const s = baseState({
+      opened: ['series', null, null, null],
+      hands: [[t('red', 11), t('blue', 2)], [], [], []],
+      melds: [{ id: 1, owner: 1, kind: 'run', tiles: [t('red', 10), J, t('red', 12), t('red', 13)] }],
+    })
+    const r = applyAction(s, 0, { type: 'add_to_meld', tile: t('red', 11), meldId: 1 })
+    expect(r.state.melds[0].tiles).toEqual([t('red', 10), t('red', 11), t('red', 12), t('red', 13)])
+    expect(r.state.hands[0]).toEqual([t('blue', 2), J])
+    expect(r.events.some((e) => e.type === 'TILE_ADDED' && e.taken === J)).toBe(true)
   })
 
   it('penalizes discarding a processable tile', () => {

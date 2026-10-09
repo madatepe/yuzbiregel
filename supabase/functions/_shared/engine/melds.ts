@@ -1,8 +1,10 @@
 import {
   compareResolved,
+  isJoker,
   resolveTile,
   type OkeyInfo,
   type ResolvedTile,
+  type TileColor,
   type TileId,
 } from './tiles.ts'
 
@@ -242,12 +244,87 @@ export function partitionPairs(ids: TileId[], okey: OkeyInfo): PairPartition {
   return { pairs, leftovers }
 }
 
-/** Returns the re-ordered meld tiles if `tile` can be added to `meld`, otherwise null. */
-export function tryAttach(meld: Meld, tile: TileId, okey: OkeyInfo): TileId[] | null {
+export interface AttachResult {
+  tiles: TileId[]
+  /** Joker taken from the meld after its gap was filled. */
+  takenJoker: TileId | null
+}
+
+/**
+ * Attaching never wraps 13→1 (12-13-1 is only valid as a laid meld).
+ * Filling a joker's exact seat returns that joker to the player.
+ */
+export function tryAttach(meld: Meld, tile: TileId, okey: OkeyInfo): AttachResult | null {
   if (meld.kind === 'pair') return null
-  const ids = [...meld.tiles, tile]
-  const analysis = meld.kind === 'run' ? analyzeRun(ids, okey) : analyzeSet(ids, okey)
-  return analysis ? analysis.tiles : null
+  return meld.kind === 'run' ? tryAttachRun(meld, tile, okey) : tryAttachSet(meld, tile, okey)
+}
+
+function firstRealColor(ids: TileId[], okey: OkeyInfo): TileColor | null {
+  for (const id of ids) {
+    const r = resolveTile(id, okey)
+    if (!r.joker) return r.color
+  }
+  return null
+}
+
+function isAceHighRun(values: number[]): boolean {
+  return values.includes(13) && values.includes(1) && !values.includes(2)
+}
+
+function tryAttachRun(meld: Meld, tile: TileId, okey: OkeyInfo): AttachResult | null {
+  const analysis = analyzeRun(meld.tiles, okey)
+  if (!analysis) return null
+  const resolved = resolveTile(tile, okey)
+  const color = firstRealColor(analysis.tiles, okey)
+  if (!color) return null
+  const aceHigh = isAceHighRun(analysis.values)
+  const seq = analysis.values.map((v) => (aceHigh && v === 1 ? 14 : v))
+
+  if (!resolved.joker && resolved.color === color) {
+    for (let i = 0; i < analysis.tiles.length; i++) {
+      if (!isJoker(analysis.tiles[i], okey) || seq[i] !== resolved.value) continue
+      const next = analysis.tiles.slice()
+      const takenJoker = next[i]
+      next[i] = tile
+      const checked = analyzeRun(next, okey)
+      if (!checked) return null
+      return { tiles: checked.tiles, takenJoker }
+    }
+  }
+
+  // 12-13-1 cannot grow; 1 cannot be processed onto a run that ends at 13.
+  if (aceHigh) return null
+
+  const min = seq[0]
+  const max = seq[seq.length - 1]
+  let next: TileId[] | null = null
+  if (resolved.joker) {
+    const canAppend = max < 13
+    const canPrepend = min > 1
+    if (canAppend && (!canPrepend || positionPoints(max + 1) >= positionPoints(min - 1))) next = [...analysis.tiles, tile]
+    else if (canPrepend) next = [tile, ...analysis.tiles]
+  } else if (resolved.color === color) {
+    if (resolved.value === max + 1 && max < 13) next = [...analysis.tiles, tile]
+    else if (resolved.value === min - 1 && min > 1) next = [tile, ...analysis.tiles]
+  }
+  if (!next) return null
+  const checked = analyzeRun(next, okey)
+  return checked ? { tiles: checked.tiles, takenJoker: null } : null
+}
+
+function tryAttachSet(meld: Meld, tile: TileId, okey: OkeyInfo): AttachResult | null {
+  const analysis = analyzeSet(meld.tiles, okey)
+  if (!analysis) return null
+  const extended = analyzeSet([...meld.tiles, tile], okey)
+  if (extended) return { tiles: extended.tiles, takenJoker: null }
+
+  const resolved = resolveTile(tile, okey)
+  if (resolved.joker) return null
+  const { reals, jokers } = split(meld.tiles, okey)
+  if (!jokers.length || resolved.value !== reals[0].value) return null
+  if (reals.some((r) => r.color === resolved.color)) return null
+  const checked = analyzeSet([...reals.map((r) => r.id), tile, ...jokers.slice(1)], okey)
+  return checked ? { tiles: checked.tiles, takenJoker: jokers[0] } : null
 }
 
 export function attachableMelds(melds: Meld[], tile: TileId, okey: OkeyInfo): number[] {
