@@ -302,10 +302,20 @@ export function applyAction(input: RoundState, seat: number, action: GameAction)
       if (!kind) throw new GameError('NOT_OPENED')
       assertInHand(hand, action.tiles)
       let melds: Omit<Meld, 'id' | 'owner'>[]
+      const pairsOnTable = state.opened.some((k) => k === 'pairs')
       if (kind === 'series') {
         const partition = partitionSeries(action.tiles, state.okey)
-        if (!partition) throw new GameError('INVALID_MELD')
-        melds = partition.melds.map((m) => ({ kind: m.kind, tiles: m.tiles }))
+        if (partition) {
+          melds = partition.melds.map((m) => ({ kind: m.kind, tiles: m.tiles }))
+        } else if (pairsOnTable) {
+          const { pairs, leftovers } = partitionPairs(action.tiles, state.okey)
+          if (leftovers.length || pairs.length === 0 || !pairs.every((p) => isPair(p, state.okey))) {
+            throw new GameError('INVALID_MELD')
+          }
+          melds = pairs.map((tiles) => ({ kind: 'pair' as const, tiles }))
+        } else {
+          throw new GameError('INVALID_MELD')
+        }
       } else {
         const { pairs, leftovers } = partitionPairs(action.tiles, state.okey)
         if (leftovers.length || pairs.length === 0 || !pairs.every((p) => isPair(p, state.okey))) {

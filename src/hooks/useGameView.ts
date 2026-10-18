@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useSession } from '@/stores/session'
+import { LOCAL_OKEY_ID } from '@/lib/okeyLocal'
 import { LOCAL_PISTI_ID } from '@/lib/pistiLocal'
 import { mySeatOf, useTable } from '@/stores/table'
 import type { ScoreRow } from '@/lib/types'
@@ -14,7 +15,9 @@ export function sideOf(seat: number, mySeat: number): SeatSide {
 
 export function useMySeat(): number {
   const userId = useSession((s) => s.userId)
-  return useTable((s) => (s.tableId === LOCAL_PISTI_ID ? 0 : mySeatOf(s.seats, userId)?.seat ?? 0))
+  return useTable((s) =>
+    s.tableId === LOCAL_PISTI_ID || s.tableId === LOCAL_OKEY_ID ? 0 : mySeatOf(s.seats, userId)?.seat ?? 0,
+  )
 }
 
 export function totalsFrom(scores: ScoreRow[]): number[] {

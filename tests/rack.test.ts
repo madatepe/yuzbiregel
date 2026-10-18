@@ -79,6 +79,27 @@ describe('rack slots', () => {
     expect(pairs[0]).toEqual([id(1, 7), id(1, 7, 1)])
   })
 
+  it('keeps 9-10-11 together when a second 10 is in the color', () => {
+    const tiles = [id(0, 9), id(0, 10), id(0, 10, 1), id(0, 11)]
+    const run = seriesGroups(tiles, okey).find((g) => g.includes(id(0, 9)))
+    expect(run).toEqual([id(0, 9), id(0, 10), id(0, 11)])
+  })
+
+  it('groups the same number in three colors', () => {
+    const nines = [id(0, 9), id(1, 9), id(2, 9), id(0, 3)]
+    const series = seriesGroups(nines, okey)
+    expect(series[0]).toEqual([id(0, 9), id(1, 9), id(2, 9)])
+  })
+
+  it('groups three 5s and three 12s ahead of pairs that would use them', () => {
+    const tiles = [id(1, 5), id(1, 6), id(0, 5), id(2, 5), id(2, 12), id(2, 13), id(1, 12), id(3, 12)]
+    const series = seriesGroups(tiles, okey)
+    const fives = series.find((g) => g.includes(id(0, 5)))
+    const twelves = series.find((g) => g.includes(id(3, 12)))
+    expect(fives).toEqual([id(0, 5), id(1, 5), id(2, 5)])
+    expect(twelves).toEqual([id(1, 12), id(2, 12), id(3, 12)])
+  })
+
   it('counts pairs arranged side by side on the rack', () => {
     const slots = emptyRack()
     ;[id(0, 9), id(0, 9, 1), null, id(1, 1), id(1, 1, 1), id(0, 4)].forEach((t, i) => (slots[i] = t))

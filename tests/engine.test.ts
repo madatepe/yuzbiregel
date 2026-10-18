@@ -40,9 +40,10 @@ describe('runs and sets', () => {
     const b = analyzeRun([t('red', 11), t('red', 12), J], okey)
     expect(b?.values).toEqual([11, 12, 13])
   })
-  it('allows 12-13-1 but not 13-1-2', () => {
-    expect(analyzeRun([t('red', 12), t('red', 13), t('red', 1)], okey)).not.toBeNull()
+  it('rejects 12-13-1 and 13-1-2', () => {
+    expect(analyzeRun([t('red', 12), t('red', 13), t('red', 1)], okey)).toBeNull()
     expect(analyzeRun([t('red', 13), t('red', 1), t('red', 2)], okey)).toBeNull()
+    expect(analyzeRun([t('red', 1), t('red', 2), t('red', 3)], okey)?.values).toEqual([1, 2, 3])
   })
   it('fake okey acts as the okey face', () => {
     expect(analyzeRun([t('yellow', 4), FAKE, t('yellow', 6)], okey)?.points).toBe(15)
@@ -114,6 +115,13 @@ describe('attach', () => {
       tiles: [t('red', 9), t('red', 10), J, t('red', 12), t('red', 13)],
       takenJoker: null,
     })
+  })
+
+  it('returns the joker standing in for 9 when that 9 is played', () => {
+    const run = { id: 1, owner: 0, kind: 'run' as const, tiles: [t('blue', 7), t('blue', 8), J, t('blue', 10)] }
+    const result = tryAttach(run, t('blue', 9), okey)
+    expect(result?.tiles).toEqual([t('blue', 7), t('blue', 8), t('blue', 9), t('blue', 10)])
+    expect(result?.takenJoker).toBe(J)
   })
 
   it('does not let 1 attach after 13', () => {
@@ -192,6 +200,28 @@ describe('round flow', () => {
     expect(f.state.result?.scores[1]).toBe(808)
   })
 
+  it('takes the joker from a pair when the real tile is played', () => {
+    const pair = { id: 1, owner: 1, kind: 'pair' as const, tiles: [t('black', 11), J] }
+    expect(tryAttach(pair, t('black', 11, 1), okey)).toEqual({
+      tiles: [t('black', 11), t('black', 11, 1)],
+      takenJoker: J,
+    })
+    expect(tryAttach(pair, t('red', 11), okey)).toBeNull()
+    expect(tryAttach({ ...pair, tiles: [t('black', 11), t('black', 11, 1)] }, t('red', 11), okey)).toBeNull()
+    expect(tryAttach({ ...pair, tiles: [J, J2] }, t('black', 11), okey)).toBeNull()
+
+    const s = baseState({
+      opened: ['pairs', 'pairs', null, null],
+      hands: [[t('black', 11, 1), t('blue', 2)], [], [], []],
+      melds: [pair],
+    })
+    const r = applyAction(s, 0, { type: 'add_to_meld', tile: t('black', 11, 1), meldId: 1 })
+    expect(r.state.melds[0].tiles).toEqual([t('black', 11), t('black', 11, 1)])
+    expect(r.state.hands[0]).toEqual([t('blue', 2), J])
+    const penalty = applyAction(s, 0, { type: 'discard', tile: t('black', 11, 1) })
+    expect(penalty.state.penalties[0]).toBe(101)
+  })
+
   it('gives the displaced joker to the attaching player', () => {
     const s = baseState({
       opened: ['series', null, null, null],
@@ -202,6 +232,32 @@ describe('round flow', () => {
     expect(r.state.melds[0].tiles).toEqual([t('red', 10), t('red', 11), t('red', 12), t('red', 13)])
     expect(r.state.hands[0]).toEqual([t('blue', 2), J])
     expect(r.events.some((e) => e.type === 'TILE_ADDED' && e.taken === J)).toBe(true)
+  })
+
+  it('does not penalize discarding 1 against 11-12-13', () => {
+    const s = baseState({
+      hands: [[t('red', 1), t('blue', 2)], [], [], []],
+      melds: [{ id: 1, owner: 1, kind: 'run', tiles: [t('red', 11), t('red', 12), t('red', 13)] }],
+    })
+    const r = applyAction(s, 0, { type: 'discard', tile: t('red', 1) })
+    expect(r.state.penalties[0]).toBe(0)
+  })
+
+  it('lets a series opener lay pairs once someone opened pairs', () => {
+    const s = baseState({
+      opened: ['series', 'pairs', null, null],
+      hands: [[t('red', 4), t('red', 4, 1), t('blue', 2)], [], [], []],
+      phase: 'discard',
+    })
+    const r = applyAction(s, 0, { type: 'lay', tiles: [t('red', 4), t('red', 4, 1)] })
+    expect(r.state.melds.at(-1)?.kind).toBe('pair')
+    expect(r.state.hands[0]).toEqual([t('blue', 2)])
+    const blocked = baseState({
+      opened: ['series', null, null, null],
+      hands: [[t('red', 4), t('red', 4, 1), t('blue', 2)], [], [], []],
+      phase: 'discard',
+    })
+    expect(() => applyAction(blocked, 0, { type: 'lay', tiles: [t('red', 4), t('red', 4, 1)] })).toThrow(/INVALID_MELD/)
   })
 
   it('penalizes discarding a processable tile', () => {

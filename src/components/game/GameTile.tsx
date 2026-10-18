@@ -15,7 +15,6 @@ interface GameTileProps {
   /** Value a joker stands for inside a meld. */
   representsValue?: number
   onClick?: (e: MouseEvent<HTMLButtonElement>) => void
-  onDoubleClick?: () => void
   disabled?: boolean
   className?: string
   style?: CSSProperties
@@ -59,7 +58,6 @@ function GameTileImpl({
   dimmed,
   representsValue,
   onClick,
-  onDoubleClick,
   disabled,
   className = '',
   style,
@@ -137,7 +135,6 @@ function GameTileImpl({
         className={`${base} ${state} ${className}`}
         style={style}
         onClick={onClick}
-        onDoubleClick={onDoubleClick}
         disabled={disabled}
         aria-pressed={selected}
         aria-label={label + (selected ? ', seçili' : '')}

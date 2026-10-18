@@ -48,14 +48,10 @@ function split(ids: TileId[], okey: OkeyInfo) {
   }
 }
 
-/** Ace may follow 13 (12-13-1); that position is 14 and scores 1. */
-function positionPoints(p: number): number {
-  return p === 14 ? 1 : p
-}
-
+/** Runs stay inside 1–13. 12-13-1 is not a run, and 1 never follows 13. */
 export function analyzeRun(ids: TileId[], okey: OkeyInfo): MeldAnalysis | null {
   const n = ids.length
-  if (n < RUN_MIN || n > 14) return null
+  if (n < RUN_MIN || n > 13) return null
   const { reals, jokers } = split(ids, okey)
   if (reals.length === 0) return null
   const color = reals[0].color
@@ -64,35 +60,27 @@ export function analyzeRun(ids: TileId[], okey: OkeyInfo): MeldAnalysis | null {
   const baseValues = reals.map((r) => r.value)
   if (new Set(baseValues).size !== baseValues.length) return null
 
-  const variants: { aceHigh: boolean; values: number[] }[] = [{ aceHigh: false, values: baseValues }]
-  if (baseValues.includes(1)) {
-    variants.push({ aceHigh: true, values: baseValues.map((v) => (v === 1 ? 14 : v)) })
-  }
+  const min = Math.min(...baseValues)
+  const max = Math.max(...baseValues)
+  if (max - min + 1 > n) return null
 
   let best: MeldAnalysis | null = null
-  for (const variant of variants) {
-    const min = Math.min(...variant.values)
-    const max = Math.max(...variant.values)
-    if (max - min + 1 > n) continue
-    const lowLimit = variant.aceHigh ? 2 : 1
-    const highLimit = !variant.aceHigh && baseValues.includes(1) ? 13 : 14
-    for (let start = max - n + 1; start <= min; start++) {
-      const end = start + n - 1
-      if (start < lowLimit || end > highLimit) continue
-      const byValue = new Map<number, ResolvedTile>()
-      reals.forEach((r, i) => byValue.set(variant.values[i], r))
-      const jokerQueue = jokers.slice()
-      const tiles: TileId[] = []
-      const values: number[] = []
-      let points = 0
-      for (let p = start; p <= end; p++) {
-        const real = byValue.get(p)
-        tiles.push(real ? real.id : jokerQueue.shift()!)
-        values.push(p === 14 ? 1 : p)
-        points += positionPoints(p)
-      }
-      if (!best || points > best.points) best = { kind: 'run', tiles, points, values }
+  for (let start = max - n + 1; start <= min; start++) {
+    const end = start + n - 1
+    if (start < 1 || end > 13) continue
+    const byValue = new Map<number, ResolvedTile>()
+    reals.forEach((r, i) => byValue.set(baseValues[i], r))
+    const jokerQueue = jokers.slice()
+    const tiles: TileId[] = []
+    const values: number[] = []
+    let points = 0
+    for (let p = start; p <= end; p++) {
+      const real = byValue.get(p)
+      tiles.push(real ? real.id : jokerQueue.shift()!)
+      values.push(p)
+      points += p
     }
+    if (!best || points > best.points) best = { kind: 'run', tiles, points, values }
   }
   return best
 }
@@ -251,12 +239,29 @@ export interface AttachResult {
 }
 
 /**
- * Attaching never wraps 13→1 (12-13-1 is only valid as a laid meld).
- * Filling a joker's exact seat returns that joker to the player.
+ * 1 never attaches after 13. Filling the value a joker stands for
+ * returns that joker to the player. A pair stays two tiles: the real match
+ * replaces its joker, and a third tile is never added.
  */
 export function tryAttach(meld: Meld, tile: TileId, okey: OkeyInfo): AttachResult | null {
-  if (meld.kind === 'pair') return null
+  if (meld.kind === 'pair') return tryAttachPair(meld, tile, okey)
   return meld.kind === 'run' ? tryAttachRun(meld, tile, okey) : tryAttachSet(meld, tile, okey)
+}
+
+function tryAttachPair(meld: Meld, tile: TileId, okey: OkeyInfo): AttachResult | null {
+  if (meld.tiles.includes(tile) || !isPair(meld.tiles, okey)) return null
+  const resolved = resolveTile(tile, okey)
+  if (resolved.joker) return null
+  const jokers = meld.tiles.filter((id) => isJoker(id, okey))
+  if (jokers.length !== 1) return null
+  const realId = meld.tiles.find((id) => !isJoker(id, okey))
+  if (realId === undefined) return null
+  const real = resolveTile(realId, okey)
+  if (real.color !== resolved.color || real.value !== resolved.value) return null
+  return {
+    tiles: meld.tiles.map((id) => (id === jokers[0] ? tile : id)),
+    takenJoker: jokers[0],
+  }
 }
 
 function firstRealColor(ids: TileId[], okey: OkeyInfo): TileColor | null {
@@ -267,18 +272,13 @@ function firstRealColor(ids: TileId[], okey: OkeyInfo): TileColor | null {
   return null
 }
 
-function isAceHighRun(values: number[]): boolean {
-  return values.includes(13) && values.includes(1) && !values.includes(2)
-}
-
 function tryAttachRun(meld: Meld, tile: TileId, okey: OkeyInfo): AttachResult | null {
   const analysis = analyzeRun(meld.tiles, okey)
   if (!analysis) return null
   const resolved = resolveTile(tile, okey)
   const color = firstRealColor(analysis.tiles, okey)
   if (!color) return null
-  const aceHigh = isAceHighRun(analysis.values)
-  const seq = analysis.values.map((v) => (aceHigh && v === 1 ? 14 : v))
+  const seq = analysis.values
 
   if (!resolved.joker && resolved.color === color) {
     for (let i = 0; i < analysis.tiles.length; i++) {
@@ -287,13 +287,10 @@ function tryAttachRun(meld: Meld, tile: TileId, okey: OkeyInfo): AttachResult | 
       const takenJoker = next[i]
       next[i] = tile
       const checked = analyzeRun(next, okey)
-      if (!checked) return null
+      if (!checked) continue
       return { tiles: checked.tiles, takenJoker }
     }
   }
-
-  // 12-13-1 cannot grow; 1 cannot be processed onto a run that ends at 13.
-  if (aceHigh) return null
 
   const min = seq[0]
   const max = seq[seq.length - 1]
@@ -301,11 +298,13 @@ function tryAttachRun(meld: Meld, tile: TileId, okey: OkeyInfo): AttachResult | 
   if (resolved.joker) {
     const canAppend = max < 13
     const canPrepend = min > 1
-    if (canAppend && (!canPrepend || positionPoints(max + 1) >= positionPoints(min - 1))) next = [...analysis.tiles, tile]
+    if (canAppend && (!canPrepend || max + 1 >= min - 1)) next = [...analysis.tiles, tile]
     else if (canPrepend) next = [tile, ...analysis.tiles]
-  } else if (resolved.color === color) {
+  } else if (resolved.color === color && resolved.value !== 1) {
     if (resolved.value === max + 1 && max < 13) next = [...analysis.tiles, tile]
-    else if (resolved.value === min - 1 && min > 1) next = [tile, ...analysis.tiles]
+  }
+  if (!next && !resolved.joker && resolved.color === color && resolved.value === min - 1 && min > 1) {
+    next = [tile, ...analysis.tiles]
   }
   if (!next) return null
   const checked = analyzeRun(next, okey)

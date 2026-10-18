@@ -52,7 +52,7 @@ const SECTIONS: { title: string; items: string[] }[] = [
     items: [
       'Ortadaki gösterge taşının bir üstü okeydir (13 ise 1). Okey ★ ile işaretlenir ve her taşın yerine geçer.',
       'Sahte okey, okeyin yerine geçen gerçek taştır: okey hangi renk ve sayıysa sahte okey de odur.',
-      'Seride 12-13-1 geçerlidir, 13-1-2 geçerli değildir.',
+      'Okey her taşın yerine geçer. 12-13-1 seri değildir; 1 yalnızca 2’nin önüne işlenir.',
     ],
   },
   {
@@ -67,6 +67,7 @@ const SECTIONS: { title: string; items: string[] }[] = [
     items: [
       'Birbirinin aynısı 5 çift ile de açabilirsin. Okey her taşla çift olur.',
       'Çift açan oyuncu sonrasında yalnızca çift açabilir ama perlere taş işleyebilir.',
+      'Masada biri çift açtıysa, seri açan oyuncu elindeki çiftleri yere işleyebilir.',
       'Çift açanın elinde kalan taşların cezası iki katıdır.',
     ],
   },
@@ -75,8 +76,8 @@ const SECTIONS: { title: string; items: string[] }[] = [
     items: [
       'Sıran gelince desteden taş çekersin ya da önceki oyuncunun attığı taşı alırsın.',
       'Yerden aldığın taşı aynı el kullanmalısın (açarak ya da işleyerek). Kullanamazsan geri bırakırsın ve +101 ceza yazılır.',
-      'Bir pere okeyin tuttuğu gerçek taşı işlersen okey eline geçer; sonra bir taş atman gerekir.',
-      '1 yalnızca 1-2-3 tarafına işlenir. 13’ün yanına 1 işlenemez (12-13-1 sadece per olarak açılır).',
+      'Bir pere okeyin tuttuğu gerçek taşı işlersen okey eline geçer; çift perinde de böyledir. Çifte üçüncü taş eklenmez.',
+      '1 yalnızca 1-2-3 tarafına işlenir. 13’ün yanına 1 işlenemez; 12-13-1 hiç geçerli değildir.',
     ],
   },
   {

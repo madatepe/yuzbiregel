@@ -143,7 +143,6 @@ export default function PistiGame() {
   const seatProps = (seat: number) => ({
     info: seats[seat],
     active: pub.status === 'playing' && pub.turn === seat,
-    handCount: pub.handCounts[seat],
     opened: null,
     total: committed[seat % 2],
     penalty: pub.status === 'playing' ? dealPts[seat % 2] : 0,
@@ -162,7 +161,7 @@ export default function PistiGame() {
     <ReactionProvider>
     <>
       <ConnectionBanner />
-      <div className="flex h-dvh flex-col overflow-hidden">
+      <div className="play-screen flex h-dvh flex-col overflow-hidden">
         <header className="flex shrink-0 items-center gap-2 px-3 py-2 sm:px-5">
           <div className="flex min-w-0 items-center gap-2">
             <span className="rounded-lg bg-black/30 px-2 py-1 text-xs font-black tracking-widest text-ivory-200">{table.code}</span>
@@ -212,7 +211,7 @@ export default function PistiGame() {
               <PlayerSeat {...seatProps(bySide.top)} side="top" />
             </div>
             <div className="flex min-h-0 flex-1 items-center justify-center">
-              <div className="felt wood-rim relative flex h-full min-h-[220px] w-full max-w-xl flex-col items-center justify-center gap-4 rounded-[2.5rem] p-4 ring-1 ring-white/10">
+              <div className="play-felt felt wood-rim relative flex h-full min-h-[220px] w-full max-w-xl flex-col items-center justify-center gap-4 rounded-[2.5rem] p-4 ring-1 ring-white/10">
                 <div className="absolute top-3 left-4 text-[11px] font-bold tracking-widest text-ivory-200/80">
                   DESTE {pub.deckCount}
                 </div>
@@ -276,6 +275,7 @@ export default function PistiGame() {
         </div>
 
         <div className="flex md:hidden gap-1 px-2 pb-1">
+          <PlayerSeat {...seatProps(mySeat)} side="bottom" compact />
           {opponents.map((s) => (
             <PlayerSeat key={s} {...seatProps(s)} side="bottom" compact />
           ))}

@@ -14,7 +14,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { attachableMelds, availableActions, type PublicRoundState, type TileId } from '@engine/index.ts'
+import { attachableMelds, availableActions, previewSelection, type OpenKind, type TileId } from '@engine/index.ts'
 import { ActionBar } from '@/components/game/ActionBar'
 import { GameResult } from '@/components/game/GameResult'
 import { GameMenu } from '@/components/game/GameMenu'
@@ -35,9 +35,10 @@ import { PlayerAvatar } from '@/components/ui/PlayerAvatar'
 import { SoundToggle } from '@/components/ui/SoundToggle'
 import { useGameActions } from '@/hooks/useGameActions'
 import { useGameAnimations } from '@/hooks/useGameAnimations'
-import { sideOf, useMySeat, useSeatInfos, useTotals, type SeatInfo } from '@/hooks/useGameView'
+import { sideOf, useMySeat, useSeatInfos, useTotals } from '@/hooks/useGameView'
 import { api } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
+import { isLocalOkey, nextLocalOkey, restartLocalOkey, stopLocalOkey } from '@/lib/okeyLocal'
 import { arrangedMeldTiles, groupLayout, pairGroups, rackTiles, seriesGroups } from '@/lib/rack'
 import { useGameUi } from '@/stores/gameUi'
 import { useSession } from '@/stores/session'
@@ -58,29 +59,6 @@ const collision: CollisionDetection = (args) => {
 
 const EMPTY: TileId[] = []
 
-const SORT_PILL =
-  'rounded-full bg-black/30 px-3 py-1 text-[11px] font-bold text-ivory-200 ring-1 ring-white/10 transition active:bg-white/15'
-
-function instructionFor(
-  pub: PublicRoundState,
-  mySeat: number,
-  seats: SeatInfo[],
-  hand: TileId[],
-): string {
-  const turnSeat = seats[pub.turn]
-  if (pub.status !== 'playing') return 'El sona erdi.'
-  if (pub.turn !== mySeat) {
-    if (turnSeat.left) return `${turnSeat.nickname} masadan ayrıldı. Koltuğun devralınması bekleniyor.`
-    return pub.phase === 'draw' ? `${turnSeat.nickname} taş çekiyor...` : `${turnSeat.nickname} oynuyor...`
-  }
-  if (pub.phase === 'draw') return 'Desteden taş çek ya da önceki oyuncunun attığı taşı al.'
-  if (pub.pendingTake !== null && hand.includes(pub.pendingTake))
-    return 'Aldığın taşı kullan: elini aç ya da işle. Kullanamazsan geri bırak (+101).'
-  if (hand.length === 1) return 'Son taşını atarak bitir!'
-  if (!pub.opened[mySeat]) return 'Perlerini ıstakada aralarında boşlukla diz, sonra elini aç. Ya da atacağın taşı seç.'
-  return 'Per aç, işle ya da bir taş at.'
-}
-
 export default function Game() {
   const navigate = useNavigate()
   const userId = useSession((s) => s.userId)
@@ -99,7 +77,6 @@ export default function Game() {
   const syncRack = useGameUi((s) => s.syncRack)
   const setRackSlots = useGameUi((s) => s.setRackSlots)
   const moveTile = useGameUi((s) => s.moveTile)
-  const setSelected = useGameUi((s) => s.setSelected)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [scoreOpen, setScoreOpen] = useState(false)
@@ -107,6 +84,7 @@ export default function Game() {
   const [showFinal, setShowFinal] = useState(false)
   const [busy, setBusy] = useState<'next' | 'restart' | 'leave' | null>(null)
   const [dragTile, setDragTile] = useState<TileId | null>(null)
+  const [countMode, setCountMode] = useState<OpenKind | null>(null)
 
   useGameAnimations(mySeat)
 
@@ -138,6 +116,13 @@ export default function Game() {
     if (!base.open || selected.length > 0) return base
     return { ...base, open: availableActions(pub, mySeat, hand, arranged, openMode).open }
   }, [pub, mySeat, hand, selected, openMode, arranged])
+
+  const perTotal = useMemo(() => {
+    if (!pub || !countMode) return null
+    const tiles = arrangedMeldTiles(rackSlots, pub.okey, countMode)
+    const preview = previewSelection(tiles, pub.okey)
+    return countMode === 'pairs' ? preview.pairs.count : preview.series.points
+  }, [pub, rackSlots, countMode])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -186,10 +171,16 @@ export default function Game() {
         const sel = useGameUi.getState().selected
         if (sel.length === 1) void discard(sel[0])
       },
-      onSortSeries: () =>
-        pub && setRackSlots(groupLayout(seriesGroups(rackTiles(useGameUi.getState().rackSlots), pub.okey))),
-      onSortPairs: () =>
-        pub && setRackSlots(groupLayout(pairGroups(rackTiles(useGameUi.getState().rackSlots), pub.okey))),
+      onSortSeries: () => {
+        if (!pub) return
+        setCountMode('series')
+        setRackSlots(groupLayout(seriesGroups(rackTiles(useGameUi.getState().rackSlots), pub.okey)))
+      },
+      onSortPairs: () => {
+        if (!pub) return
+        setCountMode('pairs')
+        setRackSlots(groupLayout(pairGroups(rackTiles(useGameUi.getState().rackSlots), pub.okey)))
+      },
     }),
     [perform, discard, pub, setRackSlots, openTiles],
   )
@@ -197,16 +188,6 @@ export default function Game() {
   const onAttachSingle = useCallback(() => {
     if (actions?.attachTargets.length) attach(actions.attachTargets[0])
   }, [actions, attach])
-
-  const onQuickDiscard = useCallback(
-    (tile: TileId) => {
-      if (canDropDiscard) {
-        setSelected([tile])
-        void discard(tile)
-      }
-    },
-    [canDropDiscard, discard, setSelected],
-  )
 
   const onDragStart = (e: DragStartEvent) => {
     const id = String(e.active.id)
@@ -234,6 +215,10 @@ export default function Game() {
       setShowFinal(true)
       return
     }
+    if (isLocalOkey()) {
+      nextLocalOkey()
+      return
+    }
     setBusy('next')
     try {
       await api.nextRound(table.id)
@@ -245,6 +230,10 @@ export default function Game() {
   }
 
   const restart = async () => {
+    if (isLocalOkey()) {
+      restartLocalOkey()
+      return
+    }
     setBusy('restart')
     try {
       await api.restartGame(table.id)
@@ -256,6 +245,11 @@ export default function Game() {
   }
 
   const leave = async () => {
+    if (isLocalOkey()) {
+      stopLocalOkey()
+      navigate('/')
+      return
+    }
     setBusy('leave')
     try {
       await api.leaveTable(table.id)
@@ -278,7 +272,6 @@ export default function Game() {
   const seatProps = (seat: number) => ({
     info: seats[seat],
     active: pub.status === 'playing' && pub.turn === seat,
-    handCount: pub.handCounts[seat],
     opened: pub.opened[seat],
     total: totals[seat],
     penalty: pub.penalties[seat],
@@ -297,7 +290,7 @@ export default function Game() {
       onDragCancel={() => setDragTile(null)}
     >
       <ConnectionBanner />
-      <div className="flex h-dvh flex-col overflow-hidden">
+      <div className="play-screen flex h-dvh flex-col overflow-hidden">
         {/* Top bar */}
         <header className="flex shrink-0 items-center gap-2 px-3 py-2 sm:px-5">
           <div className="flex min-w-0 items-center gap-2">
@@ -355,7 +348,7 @@ export default function Game() {
           <div className="hidden items-center md:col-start-1 md:row-start-2 md:flex">
             <PlayerSeat {...seatProps(bySide.left)} side="left" />
           </div>
-          <div className="min-h-[220px] md:col-start-2 md:row-start-2">
+          <div className="play-felt min-h-[220px] md:col-start-2 md:row-start-2">
             <GameTable
               pub={pub}
               mySeat={mySeat}
@@ -382,38 +375,45 @@ export default function Game() {
         </div>
 
         {/* My area */}
-        <section className="relative shrink-0 px-2 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] sm:px-4" aria-label="Senin alanın">
-          <div
-            data-anchor={`seat-${mySeat}`}
-            className="pointer-events-none absolute bottom-3 left-1/2 h-8 w-8 -translate-x-1/2 sm:hidden"
-            aria-hidden
-          />
+        <section className="my-area relative shrink-0 px-2 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] sm:px-4" aria-label="Senin alanın">
           <div className="mx-auto flex max-w-6xl flex-col gap-2">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <div
                 data-anchor={`seat-${mySeat}`}
-                className={`hidden shrink-0 items-center gap-2 rounded-2xl px-2.5 py-1.5 sm:flex ${actions.isMyTurn ? 'bg-accent/15 ring-2 ring-accent' : 'bg-black/25 ring-1 ring-white/8'}`}
+                className={`flex max-w-[46%] shrink-0 items-center gap-2 rounded-2xl px-2 py-1 sm:max-w-none sm:px-2.5 sm:py-1.5 ${actions.isMyTurn && pub.status === 'playing' ? 'bg-accent text-accent-ink' : 'bg-black/25 ring-1 ring-white/8'}`}
               >
                 <span data-anchor={`face-${mySeat}`} className="inline-flex">
-                  <PlayerAvatar name={me.nickname} size={36} active={actions.isMyTurn} />
+                  <PlayerAvatar name={me.nickname} size={32} />
                 </span>
-                <div className="leading-tight">
-                  <div className="max-w-28 truncate text-sm font-extrabold">{me.nickname}</div>
-                  <div className="text-[11px] text-ivory-300">
+                <div className="min-w-0 leading-tight">
+                  <div className="max-w-28 truncate text-xs font-extrabold sm:text-sm">{me.nickname}</div>
+                  <div className={`text-[10px] sm:text-[11px] ${actions.isMyTurn && pub.status === 'playing' ? 'text-accent-ink/80' : 'text-ivory-300'}`}>
                     El cezası{' '}
                     <span className={pub.penalties[mySeat] ? 'font-bold text-danger' : ''}>{pub.penalties[mySeat]}</span>
                     {pub.opened[mySeat] && (
-                      <span className="ml-1 font-bold text-success">· {pub.opened[mySeat] === 'pairs' ? 'Çift açtın' : 'Açtın'}</span>
+                      <span className="ml-1 font-bold">· {pub.opened[mySeat] === 'pairs' ? 'Çift' : 'Açık'}</span>
                     )}
                   </div>
                 </div>
               </div>
-              <div className="flex flex-1 justify-center">
+              <div className="flex min-w-0 flex-1 justify-center">
                 <TurnIndicator
                   isMyTurn={actions.isMyTurn}
                   over={pub.status !== 'playing'}
                   turnName={turnName}
-                  instruction={instructionFor(pub, mySeat, seats, hand)}
+                  instruction=""
+                  badge={
+                    countMode !== null && perTotal !== null ? (
+                      <span className="inline-flex items-baseline gap-1.5 rounded-full bg-black/40 px-3 py-1 ring-1 ring-white/10">
+                        <span className="text-[10px] font-bold tracking-[0.16em] text-ivory-300">
+                          {countMode === 'pairs' ? 'ÇİFT' : 'PER'}
+                        </span>
+                        <span className="text-lg font-black tabular-nums leading-none text-ivory-50">{perTotal}</span>
+                      </span>
+                    ) : (
+                      <span className="sr-only">Dizmek için Seri diz veya Çift diz</span>
+                    )
+                  }
                 />
               </div>
               <div className="hidden w-[140px] shrink-0 text-right text-xs text-ivory-400 lg:block">
@@ -421,21 +421,11 @@ export default function Game() {
               </div>
             </div>
 
-            <div className="-mb-1 flex justify-end gap-1.5 md:hidden">
-              <button type="button" onClick={handlers.onSortSeries} className={SORT_PILL}>
-                Seri diz
-              </button>
-              <button type="button" onClick={handlers.onSortPairs} className={SORT_PILL}>
-                Çift diz
-              </button>
-            </div>
-
             <TileRack
               okey={pub.okey}
               round={pub.round}
               pendingTake={pub.pendingTake}
               counted={inDiscardPhase ? arranged : EMPTY}
-              onQuickDiscard={onQuickDiscard}
             />
 
             <ActionBar

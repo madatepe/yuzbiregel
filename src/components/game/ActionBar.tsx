@@ -94,7 +94,7 @@ function ActionBarImpl({
                 disabled={!actions.canLay || busy}
                 hint={!actions.canLay ? 'Seçim geçerli per değil' : undefined}
               >
-                {actions.opened === 'pairs' ? 'Çift aç' : 'Per aç'}
+                {actions.canLayPairs ? 'Çift işle' : actions.opened === 'pairs' ? 'Çift aç' : 'Per aç'}
               </ActionButton>
             )}
             {actions.attachTargets.length > 0 && (
@@ -140,7 +140,7 @@ function ActionBarImpl({
             {feedback.message}
           </span>
         ) : (
-          <div className="hidden items-center gap-1 text-[11px] font-semibold text-ivory-400 md:flex">
+          <div className="flex items-center gap-1 text-[11px] font-semibold text-ivory-400">
             <span className="hidden sm:inline">Diz:</span>
             <button type="button" onClick={onSortSeries} className="rounded-md px-2 py-0.5 hover:bg-white/10 hover:text-ivory-50">
               Seri diz

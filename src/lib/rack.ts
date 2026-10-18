@@ -75,7 +75,10 @@ export function groupLayout(groups: TileId[][]): RackSlot[] {
   return strict() ?? wrapping() ?? compactLayout(groupsList.flat())
 }
 
-/** Runs of consecutive same-color tiles become groups; leftovers and okeys go last. */
+/**
+ * Valid runs (3+) first, then the same number in 3+ colors, then leftover pairs.
+ * A pair such as 5-6 must not swallow a 5 that completes three 5s.
+ */
 export function seriesGroups(tiles: TileId[], okey: OkeyInfo): TileId[][] {
   const sorted = sortBySeries(tiles, okey)
   const jokers = sorted.filter((t) => isJoker(t, okey))
@@ -83,17 +86,76 @@ export function seriesGroups(tiles: TileId[], okey: OkeyInfo): TileId[][] {
     const f = tileFace(id)
     return f.fake ? { color: okey.color, value: okey.value } : { color: f.color!, value: f.value! }
   }
-  const runs: TileId[][] = []
+  const byColor = new Map<string, Map<number, TileId[]>>()
   for (const t of sorted) {
     if (isJoker(t, okey)) continue
-    const last = runs[runs.length - 1]
-    const prev = last?.[last.length - 1]
-    if (prev !== undefined && face(prev).color === face(t).color && face(t).value === face(prev).value + 1) last.push(t)
-    else runs.push([t])
+    const { color, value } = face(t)
+    const values = byColor.get(color) ?? new Map<number, TileId[]>()
+    values.set(value, [...(values.get(value) ?? []), t])
+    byColor.set(color, values)
   }
-  const kept = runs.filter((r) => r.length >= 2)
-  const singles = runs.filter((r) => r.length < 2).flat()
-  return [...kept, [...singles, ...jokers]]
+  const used = new Set<TileId>()
+  const available = (values: Map<number, TileId[]>, value: number) =>
+    (values.get(value) ?? []).filter((id) => !used.has(id))
+
+  const peelRuns = (minLength: number) => {
+    const found: TileId[][] = []
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const values of byColor.values()) {
+        let current: TileId[] = []
+        const commit = () => {
+          if (current.length >= minLength) {
+            current.forEach((id) => used.add(id))
+            found.push(current)
+            changed = true
+          }
+          current = []
+        }
+        for (let value = 1; value <= 13; value++) {
+          const next = available(values, value)[0]
+          if (!next) {
+            if (current.length) commit()
+            continue
+          }
+          if (current.length === 0) {
+            current = [next]
+            continue
+          }
+          if (value === face(current[current.length - 1]).value + 1) current.push(next)
+          else {
+            commit()
+            current = [next]
+          }
+        }
+        commit()
+      }
+    }
+    return found
+  }
+
+  const runs = peelRuns(3)
+  const byNumber = new Map<number, TileId[]>()
+  for (const t of sorted) {
+    if (isJoker(t, okey) || used.has(t)) continue
+    const value = face(t).value
+    const bucket = byNumber.get(value) ?? []
+    if (bucket.some((id) => face(id).color === face(t).color)) continue
+    bucket.push(t)
+    byNumber.set(value, bucket)
+  }
+  const sets: TileId[][] = []
+  for (const group of byNumber.values()) {
+    if (group.length >= 3) {
+      const set = group.slice(0, 4)
+      set.forEach((id) => used.add(id))
+      sets.push(set)
+    }
+  }
+  const pairs = peelRuns(2)
+  const rest = sorted.filter((t) => !isJoker(t, okey) && !used.has(t))
+  return [...runs, ...sets, ...pairs, [...rest, ...jokers]]
 }
 
 /** Identical tiles side by side as separate groups; the rest last. */

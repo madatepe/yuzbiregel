@@ -1,4 +1,4 @@
-import { isJoker, tileFace, type OkeyInfo, type TileColor, type TileId } from '@engine/index.ts'
+import { isJoker, resolveTile, tileFace, type OkeyInfo, type TileColor, type TileId } from '@engine/index.ts'
 
 export const COLOR_NAMES: Record<TileColor, string> = {
   red: 'Kırmızı',
@@ -19,6 +19,11 @@ export function tileLabel(id: TileId, okey?: OkeyInfo | null): string {
   if (f.fake) return 'Sahte okey'
   const name = `${COLOR_NAMES[f.color!]} ${f.value}`
   return okey && isJoker(id, okey) ? `Okey (${name})` : name
+}
+
+/** Face value of the hand. An okey counts as its own number, not the 101 penalty. */
+export function facePoints(tiles: TileId[], okey: OkeyInfo): number {
+  return tiles.reduce((sum, id) => sum + resolveTile(id, okey).value, 0)
 }
 
 const COLOR_RANK: Record<TileColor, number> = { red: 0, blue: 1, yellow: 2, black: 3 }

@@ -3,6 +3,7 @@ import type { GameAction, TileId } from '@engine/index.ts'
 import { api } from '@/lib/api'
 import { errorCode, errorMessage } from '@/lib/errors'
 import { rememberTiles } from '@/lib/fly'
+import { applyLocalOkey, isLocalOkey } from '@/lib/okeyLocal'
 import { resyncTable } from '@/lib/realtime'
 import { playSound } from '@/lib/sound'
 import { useGameUi } from '@/stores/gameUi'
@@ -18,6 +19,11 @@ export function useGameActions() {
     ui.setBusy(true, movingTiles)
     ui.clearFeedback()
     try {
+      if (isLocalOkey()) {
+        applyLocalOkey(action)
+        if (action.type !== 'draw_deck' && action.type !== 'take_discard') useGameUi.getState().clearSelection()
+        return true
+      }
       await api.action(tableId, action)
       if (action.type !== 'draw_deck' && action.type !== 'take_discard') ui.clearSelection()
       // Keep the pending hint until the realtime hand update removes the tiles.

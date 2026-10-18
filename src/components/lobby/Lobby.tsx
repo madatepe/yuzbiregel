@@ -66,6 +66,12 @@ export function Lobby({ game = 'okey101' }: { game?: GameKind }) {
     }
   }
 
+  const playBots = () => {
+    if (!checkNick()) return
+    playSound('open')
+    navigate('/tekli')
+  }
+
   const find = (e: FormEvent) => {
     e.preventDefault()
     const clean = code.trim().toUpperCase()
@@ -208,6 +214,15 @@ export function Lobby({ game = 'okey101' }: { game?: GameKind }) {
           >
             Masa oluştur
           </ActionButton>
+          {game === 'okey101' && (
+            <button
+              type="button"
+              onClick={playBots}
+              className="text-sm font-bold tracking-wider text-ivory-300 underline-offset-4 hover:text-accent-strong hover:underline"
+            >
+              Botlarla oyna
+            </button>
+          )}
         </div>
       ) : (
         <form className="flex flex-col gap-6 animate-fade-up" onSubmit={find}>

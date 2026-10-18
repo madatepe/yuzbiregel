@@ -28,6 +28,8 @@ export interface AvailableActions {
     reason: 'need_more' | 'invalid' | 'must_use_taken' | 'keep_one' | null
   } | null
   canLay: boolean
+  /** Series opener laying pairs because someone at the table opened with pairs. */
+  canLayPairs: boolean
   attachTargets: number[]
   willFinish: boolean
 }
@@ -54,6 +56,7 @@ export function availableActions(
 
   let open: AvailableActions['open'] = null
   let canLay = false
+  let canLayPairs = false
   if (!opened) {
     const preview = previewSelection(selected, pub.okey)
     if (openMode === 'series') {
@@ -75,7 +78,13 @@ export function availableActions(
     }
   } else if (inDiscard && selected.length > 0 && keepsOne) {
     const preview = previewSelection(selected, pub.okey)
-    canLay = opened === 'series' ? preview.series.valid : preview.pairs.valid
+    const pairsOnTable = pub.opened.some((k) => k === 'pairs')
+    if (opened === 'series') {
+      canLayPairs = pairsOnTable && preview.pairs.valid && !preview.series.valid
+      canLay = preview.series.valid || canLayPairs
+    } else {
+      canLay = preview.pairs.valid
+    }
   }
 
   const attachTargets =
@@ -98,6 +107,7 @@ export function availableActions(
     opened,
     open,
     canLay,
+    canLayPairs,
     attachTargets,
     willFinish: inDiscard && hand.length === 1,
   }

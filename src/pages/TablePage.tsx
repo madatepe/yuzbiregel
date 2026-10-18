@@ -31,10 +31,10 @@ export function TablePage({ expectedGame = 'okey101' }: { expectedGame?: GameKin
     const attempt = (left: number) => {
       supabase
         .from('game_tables')
-        .select('id')
+        .select('id, game_type')
         .eq('code', code.toUpperCase())
         .maybeSingle()
-        .then(async ({ data, error }) => {
+        .then(({ data, error }) => {
           if (cancelled) return
           if (error) {
             if (left > 0) timer = setTimeout(() => attempt(left - 1), 2000)
@@ -45,8 +45,11 @@ export function TablePage({ expectedGame = 'okey101' }: { expectedGame?: GameKin
             setLookup('missing')
             return
           }
-          const typed = await supabase.from('game_tables').select('game_type').eq('id', data.id).maybeSingle()
-          const kind = (typed.error ? 'okey101' : (((typed.data as { game_type?: GameKind } | null)?.game_type ?? 'okey101') as GameKind))
+          const kind = data.game_type
+          if (kind !== 'okey101' && kind !== 'pisti') {
+            setLookup('error')
+            return
+          }
           if (kind !== expectedGame) {
             setRedirectTo(tablePath(code.toUpperCase(), kind))
             return
@@ -71,6 +74,8 @@ export function TablePage({ expectedGame = 'okey101' }: { expectedGame?: GameKin
   const loaded = useTable((s) => s.loaded)
   const missing = useTable((s) => s.missing)
   const seated = useTable((s) => !!mySeatOf(s.seats, userId))
+  const pisti = useTable((s) => s.pisti)
+  const showPisti = table?.game_type === 'pisti' || !!pisti
 
   if (redirectTo) return <Navigate to={redirectTo} replace />
   if (ready && !userId) return <TableClosed reason="error" />
@@ -82,7 +87,7 @@ export function TablePage({ expectedGame = 'okey101' }: { expectedGame?: GameKin
   if (table.status === 'waiting') return <WaitingRoom />
   return (
     <Suspense fallback={<FullScreenLoader label="Masa hazırlanıyor..." />}>
-      {expectedGame === 'pisti' ? <PistiGame /> : <Game />}
+      {showPisti ? <PistiGame /> : <Game />}
     </Suspense>
   )
 }

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { Home } from '@/pages/Home'
 import { PistiHome } from '@/pages/PistiHome'
+import { OkeySoloPage } from '@/pages/OkeySoloPage'
 import { PistiSoloPage } from '@/pages/PistiSoloPage'
 import { TablePage } from '@/pages/TablePage'
 import { Toaster } from '@/components/ui/Toaster'
@@ -18,6 +19,7 @@ export default function App() {
       <Toaster />
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/tekli" element={<OkeySoloPage />} />
         <Route path="/pisti" element={<PistiHome />} />
         <Route path="/pisti/tekli" element={<PistiSoloPage />} />
         <Route path="/pisti/:code" element={<TablePage expectedGame="pisti" />} />

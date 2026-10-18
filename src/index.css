@@ -99,6 +99,26 @@
   :root { --tile-w: 30px; --tile-h: 44px; --tile-font: 17px; }
 }
 
+/* Short landscape phones are wide enough to miss the phone breakpoints, so shrink the table by height. */
+@media (orientation: landscape) and (max-height: 520px) {
+  :root {
+    --tile-w: 22px;
+    --tile-h: 31px;
+    --tile-font: 13px;
+    --rack-tile-max: 22px;
+  }
+  .play-screen > header {
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+  }
+  .play-felt {
+    min-height: 128px !important;
+  }
+  .play-screen .my-area {
+    padding-top: 0.25rem !important;
+  }
+}
+
 :root { --rack-tile-max: 46px; }
 @media (max-width: 1100px) { :root { --rack-tile-max: 40px; } }
 @media (max-width: 640px) { :root { --rack-tile-max: 30px; } }

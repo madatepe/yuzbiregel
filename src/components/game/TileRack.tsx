@@ -18,7 +18,6 @@ interface RackTileProps {
   inFlight: boolean
   dealDelay: number | null
   onToggle: (id: TileId) => void
-  onQuickDiscard: (id: TileId) => void
 }
 
 const RackTile = memo(function RackTile({
@@ -30,7 +29,6 @@ const RackTile = memo(function RackTile({
   inFlight,
   dealDelay,
   onToggle,
-  onQuickDiscard,
 }: RackTileProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: rackDndId(id) })
   return (
@@ -52,7 +50,6 @@ const RackTile = memo(function RackTile({
         selected={selected}
         highlight={counted}
         onClick={() => onToggle(id)}
-        onDoubleClick={() => onQuickDiscard(id)}
         badge={
           pending ? (
             <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 rounded-full bg-warning px-1 text-[8px] font-black text-[#3a2500]">
@@ -86,10 +83,9 @@ interface TileRackProps {
   pendingTake: TileId | null
   /** Tiles counted toward opening from the rack arrangement (outlined). */
   counted: TileId[]
-  onQuickDiscard: (id: TileId) => void
 }
 
-function TileRackImpl({ okey, round, pendingTake, counted, onQuickDiscard }: TileRackProps) {
+function TileRackImpl({ okey, round, pendingTake, counted }: TileRackProps) {
   const slots = useGameUi((s) => s.rackSlots)
   const selected = useGameUi((s) => s.selected)
   const toggleSelect = useGameUi((s) => s.toggleSelect)
@@ -144,7 +140,6 @@ function TileRackImpl({ okey, round, pendingTake, counted, onQuickDiscard }: Til
                   inFlight={pendingTiles.includes(id)}
                   dealDelay={deal}
                   onToggle={onToggle}
-                  onQuickDiscard={onQuickDiscard}
                 />
               )}
             </RackSlotCell>
