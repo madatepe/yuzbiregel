@@ -10,7 +10,7 @@ import { PlayerAvatar } from '@/components/ui/PlayerAvatar'
 import { SoundToggle } from '@/components/ui/SoundToggle'
 import { api } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
-import { homePath } from '@/lib/gameKind'
+import { gameTitle, homePath } from '@/lib/gameKind'
 import { playSound } from '@/lib/sound'
 import { useSession } from '@/stores/session'
 import { useTable } from '@/stores/table'
@@ -61,6 +61,10 @@ export function WaitingRoom() {
       </div>
 
       <div className="flex w-full max-w-lg flex-col items-center gap-6 rounded-3xl border border-line bg-surface/85 p-6 shadow-2xl backdrop-blur animate-fade-up sm:p-8">
+        <div className="text-center">
+          <p className="text-xs font-bold tracking-[0.28em] text-ivory-400">OYUN</p>
+          <h1 className="text-2xl font-black tracking-wide text-accent-strong">{gameTitle(table.game_type)}</h1>
+        </div>
         <TableCode code={table.code} />
 
         <div className="w-full">
@@ -120,7 +124,7 @@ export function WaitingRoom() {
 
         <div className="flex w-full justify-center gap-6 rounded-2xl bg-black/20 py-3 text-center">
           <div>
-            <div className="text-[11px] font-bold tracking-[0.2em] text-ivory-400">OYUN</div>
+            <div className="text-[11px] font-bold tracking-[0.2em] text-ivory-400">TÜR</div>
             <div className="font-extrabold">
               {table.game_type === 'pisti'
                 ? table.mode === 'solo'

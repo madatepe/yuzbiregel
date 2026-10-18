@@ -71,7 +71,7 @@ Deno.serve(
         await advancePistiBots(db, table.id, seats)
       }
 
-      return { tableId: data.id, code: data.code, seat: 0 }
+      return { tableId: data.id, code: data.code, seat: 0, gameType }
     }
     throw new ApiError('INTERNAL', 500)
   }),

@@ -27,6 +27,7 @@ export interface JoinResult {
   tableId: string
   code: string
   seat: number
+  gameType?: GameKind
 }
 
 export const api = {

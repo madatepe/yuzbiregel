@@ -4,8 +4,8 @@ import { ActionButton } from '@/components/ui/ActionButton'
 import { NicknameField, validNickname } from './NicknameField'
 import { api } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
-import type { GameKind } from '@/lib/gameKind'
-import { tablePath } from '@/lib/gameKind'
+import { asGameKind, tablePath, type GameKind } from '@/lib/gameKind'
+import { supabase } from '@/lib/supabase'
 import { playSound } from '@/lib/sound'
 import { useSession } from '@/stores/session'
 import { toast } from '@/stores/toast'
@@ -36,6 +36,12 @@ export function Lobby({ game = 'okey101' }: { game?: GameKind }) {
   const [nickInvalid, setNickInvalid] = useState(false)
   const [codeInvalid, setCodeInvalid] = useState(false)
 
+  const kindOf = async (code: string): Promise<GameKind | null> => {
+    const { data, error } = await supabase.from('game_tables').select('game_type').eq('code', code).maybeSingle()
+    if (error || !data) return null
+    return asGameKind(data.game_type)
+  }
+
   const checkNick = () => {
     const ok = validNickname(nickname)
     setNickInvalid(!ok)
@@ -58,7 +64,8 @@ export function Lobby({ game = 'okey101' }: { game?: GameKind }) {
           : { nickname: nickname.trim(), mode, rounds, gameType: 'okey101' },
       )
       playSound('open')
-      navigate(tablePath(res.code, game))
+      const kind = asGameKind(res.gameType) ?? (await kindOf(res.code)) ?? game
+      navigate(tablePath(res.code, kind))
     } catch (err) {
       toast(errorMessage(err), 'error')
     } finally {
@@ -72,7 +79,7 @@ export function Lobby({ game = 'okey101' }: { game?: GameKind }) {
     navigate('/tekli')
   }
 
-  const find = (e: FormEvent) => {
+  const find = async (e: FormEvent) => {
     e.preventDefault()
     const clean = code.trim().toUpperCase()
     if (!/^[A-Z0-9]{6}$/.test(clean)) {
@@ -80,7 +87,23 @@ export function Lobby({ game = 'okey101' }: { game?: GameKind }) {
       playSound('invalid')
       return
     }
-    navigate(tablePath(clean, game))
+    if (!checkNick()) return
+    setBusy(true)
+    try {
+      const kind = await kindOf(clean)
+      if (!kind) {
+        toast('Bu masa bulunamadı.', 'error')
+        playSound('invalid')
+        return
+      }
+      playSound('open')
+      navigate(tablePath(clean, kind))
+    } catch (err) {
+      toast(errorMessage(err), 'error')
+      playSound('invalid')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -246,7 +269,7 @@ export function Lobby({ game = 'okey101' }: { game?: GameKind }) {
             />
             {codeInvalid && <span className="text-xs font-medium text-danger">Masa kodu 6 karakter olmalı.</span>}
           </div>
-          <ActionButton type="submit" size="lg" block disabled={!ready}>
+          <ActionButton type="submit" size="lg" block disabled={!ready} loading={busy}>
             Masayı bul
           </ActionButton>
         </form>
